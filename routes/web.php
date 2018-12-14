@@ -11,8 +11,12 @@
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', 'StreamController@index')
+    ->name('stream.index');
+Route::get('/record', 'StreamController@record')
+    ->name('stream.record');
 
-Route::get('/stream', 'StreamController@index');
+Route::get('/stream', 'StreamController@pull')
+    ->name('stream.pull');
+Route::post('/stream', 'StreamController@push')
+    ->name('stream.push');
