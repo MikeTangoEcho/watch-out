@@ -20,40 +20,29 @@ class StreamController extends Controller
 
     public function push(Request $request)
     {
+        //https://axel.isouard.fr/blog/2016/05/24/streaming-webm-video-over-html5-with-media-source
         Log::debug('Receiving stream');
-        Storage::append('steam.webm', $request->getContent());
+        Storage::append('stream-' . $request->header('X-Block-Chunk-Id') . '.webm', $request->getContent());
     }
 
     public function pull()
     {
         // Change header of stream ?
+        // Inject ADS in init segment
         return response()->stream(function() {
+            // Forge file
+            //https://chromium.googlesource.com/webm/libvpx/+/master/webmdec.h
+            // https://www.w3.org/TR/media-source/#init-segment
             // TODO: query DB to b check if need to switch file
             Log::debug("Start streaming");
-            $stream = [];
-            $stream[0] = Storage::readStream("oldspice.mp4");
-            $stream[1] = Storage::readStream("oldspice2.mp4");
-            $stream_id = 0;
-            $max_loop = 2;
-            $bytesToRead = 1024;
-            while ($max_loop > 0) {
-                if (feof($stream[$stream_id])) {
-                    rewind($stream[$stream_id]);
-                    $stream_id = ($stream_id + 1) % 2;
-                    $max_loop--;
-                    Log::debug("Loop " . $max_loop);
-                }
-                Log::debug("Streaming " . $stream_id);
-                $data = fread($stream[$stream_id], $bytesToRead);
-                echo $data;
-                flush();
+            for ($i = 1; $i < 5; $i++) {
+                $stream = Storage::readStream("stream-" . $i . ".webm");    
+                fpassthru($stream);
+                fclose($stream);    
             }
-            Log::debug("End of streaming ");
-            fclose($stream[0]);
-            fclose($stream[1]);
-        }, 206, [
+        }, 200, [
             'Cache-Control'         => 'must-revalidate, no-cache, no-store',
-            'Content-Type'          => Storage::mimeType("oldspice2.mp4"),
+            'Content-Type'          => 'video/webm',
             'Pragma'                => 'public',
         ]);
     }

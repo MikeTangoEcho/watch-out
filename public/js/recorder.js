@@ -6,8 +6,8 @@ var mediaStream;
 
 var constraints = {
     audio: true,
-//    video: true
-    video: { width: 1280, height: 720 }
+    video: true
+//    video: { width: 1280, height: 720 }
 }; 
 
 function handleDataAvailable(event) {
@@ -16,7 +16,9 @@ function handleDataAvailable(event) {
     recordedBlobs.push(event.data);
     // Push Data
     // TODO mark uploaded records
-    axios.post('/stream', event.data)
+    axios.post('/stream', event.data, { headers: {
+      'X-Block-Chunk-Id': recordedBlobs.length,
+    }})
       .then(function (response) {
         console.log(response);
       })
@@ -28,7 +30,11 @@ function handleDataAvailable(event) {
 
 function startRecording() {
   recordedBlobs = [];
-  var options = {mimeType: 'video/webm'};
+  var options = {
+//    audioBitsPerSecond : 128000,
+//    videoBitsPerSecond : 2500000,
+    mimeType: 'video/webm'
+  };
 
   try {
     mediaRecorder = new MediaRecorder(mediaStream, options);
@@ -43,7 +49,7 @@ function startRecording() {
     console.log('Recorder stopped: ', event);
   };
   mediaRecorder.ondataavailable = handleDataAvailable;
-  mediaRecorder.start(1000); // Blob of 1 sec
+  mediaRecorder.start(2000); // Blob of 1 sec
   console.log('MediaRecorder started', mediaRecorder);
 }
 
@@ -55,6 +61,17 @@ function stopRecording() {
 
 function handleSuccess(stream) {
   console.log('getUserMedia() got stream:', stream);
+
+  // re-add the stop function
+  // Chrome deprecated stop function
+  if(!stream.stop && stream.getTracks) {
+    stream.stop = function(){         
+      this.getTracks().forEach(function (track) {
+         track.stop();
+      });
+    };
+  }
+
   mediaStream = stream;
   previewVideo.srcObject = stream;
   startRecording();
