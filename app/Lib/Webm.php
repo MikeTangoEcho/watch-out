@@ -6,15 +6,6 @@ class Webm
 {
     // https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/common/webmids.h
     private $kMkvEBML = '1a45dfa3';
-    private $kMkvEBMLVersion = '4286';
-    private $kMkvEBMLReadVersion = '42f7';
-    private $kMkvEBMLMaxIDLength = '42f2';
-    private $kMkvEBMLMaxSizeLength = '42f3';
-    private $kMkvDocType = '4282';
-    private $kMkvDocTypeVersion = '4287';
-    private $kMkvDocTypeReadVersion = '4285';
-    private $kMkvSegment = '18538067';
-    private $kMkvSeekHead = '114D9B74';
 
     private $ebmlStruct = [
         '4286' => [
@@ -141,9 +132,14 @@ class Webm
             'name' => 'FrameRate',
             'format' => 'str'
         ],
+        '1f43b675' => [
+            'name' => 'Cluster',
+            'format' => 'str'
+        ],
     ];
 
     private $kMaxIdLengthInBytes = 4;
+    private $kMkvEBMLMaxSizeLength = 8;
 
     private function readId($stream) {
         // https://matroska.org/technical/specs/index.html
@@ -168,16 +164,25 @@ class Webm
      * https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/mkvparser/mkvparser.cc#172
      */
     private function getUIntLength($stream) {
-        $b = fread($stream, 1);
-        // TODO whats the fuck
-        if (ord($b) > 0x80)
-            return ord($b) - 0x80;
-        if (ord($b) == 0x01)
-            return 7;
-        if (ord($b) < 0x80)
-            return ord($b) + 6;
-        
-        throw new \Exception('Unknown length : ' . ord($b));
+        // First bit will tell size
+        $size = 0;
+        $length = '';
+        $checkBytes = 0x80;
+        while (($char = fread($stream, 1)) && $size < $this->kMkvEBMLMaxSizeLength) {
+            $length .= $char;
+            if (($checkBytes >> $size) & ord($length[0])) {
+                break;
+            }
+            $size++;
+        }
+        if  (!$length) {
+            return 0;
+        }
+        $length[0] = chr(ord($length[0]) ^ ($checkBytes >> $size));
+        var_dump(bin2hex($length));
+        if (bin2hex($length) == "00ffffffffffffff") // Unkown size for streaming
+            return -1;
+        return hexdec(bin2hex($length));
     }
 
     private function UnserializeUInt($bin) {
@@ -191,119 +196,43 @@ class Webm
         // Look for EBML header
         $pos = 0;
         $ebmlHeader = $this->readId($stream);
-        //$ebmlHeader = fread($stream, 4);
         if (bin2hex($ebmlHeader) != $this->kMkvEBML) {
             throw new \Exception("Invalid file format");
         }
         // Read length of size field.
         $ebmlHeaderSizeLength = $this->getUIntLength($stream);
         // Read the EBML header size.
-        $ebmlHeaderSize = fread($stream, $ebmlHeaderSizeLength);
+        //$ebmlHeaderSize = fread($stream, $ebmlHeaderSizeLength);
         // Read header size to find start of payload
+        echo "Start READING\n";
         $headers = [];
         while (!feof($stream)) {
             echo("-------------------------\n");
             $id = $this->readId($stream);
-            var_dump(bin2hex($id));
             $valueLength = $this->getUIntLength($stream);
-            $value = fread($stream, $valueLength);
-            var_dump(bin2hex($id) . ":L:" . $valueLength . ":V:" . bin2hex($value));
+            $value_start = ftell($stream);
+            if ($valueLength == -1) { // Unknown sizen
+                $value = "Unkown";
+                $value_end = "Unkown";
+            } else if ($valueLength == 0) {
+                $value = null;
+                $value_end = $value_start;
+            } else {
+                $value_end = $value_start + $valueLength;
+                $value = fread($stream, $valueLength);
+            }
+            var_dump(bin2hex($id) . ":L:" . $valueLength . ":V:" . substr(bin2hex($value), 0, 20));
             if (isset($this->ebmlStruct[bin2hex($id)])) {
                 $struct = $this->ebmlStruct[bin2hex($id)];
-                $headers[$struct['name']] = ($struct['format'] == 'int' ? $this->UnserializeUInt($value) : $value);
-            } else {
-                var_dump($headers);
+                $headers[$struct['name']] = [
+                    'start' => $value_start,
+                    'end' => $value_end,
+                    'value' => ($struct['format'] == 'int' ? $this->UnserializeUInt($value) : substr($value, 0, 25))
+                ];
+            } else if ($id) {
                 throw new \Exception('Unknown element Id ' . bin2hex($id));
             }
         }
-        
-
-
-        // ParseElementHeader until end
-
-/*
-long len = 0;
-  const long long ebml_id = ReadID(pReader, pos, len);
-  if (ebml_id == E_BUFFER_NOT_FULL)
-    return E_BUFFER_NOT_FULL;
-  if (len != 4 || ebml_id != libwebm::kMkvEBML)
-    return E_FILE_FORMAT_INVALID;
-  // Move read pos forward to the EBML header size field.
-  pos += 4;
-  // Read length of size field.
-  long long result = GetUIntLength(pReader, pos, len);
-  if (result < 0)  // error
-    return E_FILE_FORMAT_INVALID;
-  else if (result > 0)  // need more data
-    return E_BUFFER_NOT_FULL;
-  if (len < 1 || len > 8)
-    return E_FILE_FORMAT_INVALID;
-  if ((total >= 0) && ((total - pos) < len))
-    return E_FILE_FORMAT_INVALID;
-  if ((available - pos) < len)
-    return pos + len;  // try again later
-  // Read the EBML header size.
-  result = ReadUInt(pReader, pos, len);
-  if (result < 0)  // error
-    return result;
-n;  // consume size field
-  // pos now designates start of payload
-  if ((total >= 0) && ((total - pos) < result))
-    return E_FILE_FORMAT_INVALID;
-  if ((available - pos) < result)
-    return pos + result;
-  const long long end = pos + result;
-  Init();
-  while (pos < end) {
-    long long id, size;
-    status = ParseElementHeader(pReader, pos, end, id, size);
-    if (status < 0)  // error
-      return status;
-    if (size == 0)
-      return E_FILE_FORMAT_INVALID;
-    if (id == libwebm::kMkvEBMLVersion) {
-      m_version = UnserializeUInt(pReader, pos, size);
-      if (m_version <= 0)
-        return E_FILE_FORMAT_INVALID;
-    } else if (id == libwebm::kMkvEBMLReadVersion) {
-      m_readVersion = UnserializeUInt(pReader, pos, size);
-      if (m_readVersion <= 0)
-        return E_FILE_FORMAT_INVALID;
-    } else if (id == libwebm::kMkvEBMLMaxIDLength) {
-      m_maxIdLength = UnserializeUInt(pReader, pos, size);
-      if (m_maxIdLength <= 0)
-        return E_FILE_FORMAT_INVALID;
-    } else if (id == libwebm::kMkvEBMLMaxSizeLength) {
-      m_maxSizeLength = UnserializeUInt(pReader, pos, size);
-      if (m_maxSizeLength <= 0)
-        return E_FILE_FORMAT_INVALID;
-    } else if (id == libwebm::kMkvDocType) {
-      if (m_docType)
-        return E_FILE_FORMAT_INVALID;
-      status = UnserializeString(pReader, pos, size, m_docType);
-      if (status)  // error
-        return status;
-    } else if (id == libwebm::kMkvDocTypeVersion) {
-      m_docTypeVersion = UnserializeUInt(pReader, pos, size);
-      if (m_docTypeVersion <= 0)
-        return E_FILE_FORMAT_INVALID;
-    } else if (id == libwebm::kMkvDocTypeReadVersion) {
-      m_docTypeReadVersion = UnserializeUInt(pReader, pos, size);
-      if (m_docTypeReadVersion <= 0)
-        return E_FILE_FORMAT_INVALID;
-    }
-    pos += size;
-  }
-  if (pos != end)
-    return E_FILE_FORMAT_INVALID;
-  // Make sure DocType, DocTypeReadVersion, and DocTypeVersion are valid.
-  if (m_docType == NULL || m_docTypeReadVersion <= 0 || m_docTypeVersion <= 0)
-    return E_FILE_FORMAT_INVALID;
-  // Make sure EBMLMaxIDLength and EBMLMaxSizeLength are valid.
-  if (m_maxIdLength <= 0 || m_maxIdLength > 4 || m_maxSizeLength <= 0 ||
-      m_maxSizeLength > 8)
-    return E_FILE_FORMAT_INVALID;
-  return 0;
-*/
+        var_dump($headers);
     }
 }
