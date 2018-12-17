@@ -4,6 +4,8 @@ namespace App\Lib;
 
 class Webm
 {
+    public $debug = False;
+
     // https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/common/webmids.h
     private $kMkvEBML = '1a45dfa3';
 
@@ -179,7 +181,7 @@ class Webm
             return 0;
         }
         $length[0] = chr(ord($length[0]) ^ ($checkBytes >> $size));
-        var_dump(bin2hex($length));
+
         if (bin2hex($length) == "00ffffffffffffff") // Unkown size for streaming
             return -1;
         return hexdec(bin2hex($length));
@@ -188,10 +190,16 @@ class Webm
     private function UnserializeUInt($bin) {
         return unpack('C', $bin)[1];
     }
+
+    private function log($o) {
+        if ($this->debug)
+            var_dump($o);
+    }
+
     /**
      * Extract the header from the first tracks to allow replay at anytime
      */
-    public function read($stream)
+    public function parse($stream, $extractData=false, $extractNested=false)
     {
         // Look for EBML header
         $pos = 0;
@@ -199,40 +207,39 @@ class Webm
         if (bin2hex($ebmlHeader) != $this->kMkvEBML) {
             throw new \Exception("Invalid file format");
         }
-        // Read length of size field.
-        $ebmlHeaderSizeLength = $this->getUIntLength($stream);
         // Read the EBML header size.
-        //$ebmlHeaderSize = fread($stream, $ebmlHeaderSizeLength);
-        // Read header size to find start of payload
-        echo "Start READING\n";
-        $headers = [];
+        $ebmlHeaderSizeLength = $this->getUIntLength($stream);
+        $ebml = [
+            'EBMLHeaderOffset' => ftell($stream),
+            'EBMLHeaderSize' => $ebmlHeaderSizeLength,            
+        ];
         while (!feof($stream)) {
-            echo("-------------------------\n");
+            $tagStart = ftell($stream);
             $id = $this->readId($stream);
             $valueLength = $this->getUIntLength($stream);
-            $value_start = ftell($stream);
+            $valueStart = ftell($stream);
             if ($valueLength == -1) { // Unknown sizen
                 $value = "Unkown";
-                $value_end = "Unkown";
             } else if ($valueLength == 0) {
                 $value = null;
-                $value_end = $value_start;
             } else {
-                $value_end = $value_start + $valueLength;
                 $value = fread($stream, $valueLength);
             }
-            var_dump(bin2hex($id) . ":L:" . $valueLength . ":V:" . substr(bin2hex($value), 0, 20));
+            $this->log(bin2hex($id) . ":L:" . $valueLength . ":V:" . substr(bin2hex($value), 0, 20));
             if (isset($this->ebmlStruct[bin2hex($id)])) {
                 $struct = $this->ebmlStruct[bin2hex($id)];
-                $headers[$struct['name']] = [
-                    'start' => $value_start,
-                    'end' => $value_end,
-                    'value' => ($struct['format'] == 'int' ? $this->UnserializeUInt($value) : substr($value, 0, 25))
+                $ebml[$struct['name']] = [
+                    'offset' => $tagStart,
+                    'valueOffset' => $valueStart,
+                    'valueLength' => $valueLength,
+                    'value' => ($struct['format'] == 'int' ?
+                        $this->UnserializeUInt($value) : substr($value, 0, 25))
                 ];
             } else if ($id) {
                 throw new \Exception('Unknown element Id ' . bin2hex($id));
             }
         }
-        var_dump($headers);
+        $this->log($ebml);
+        return $ebml;
     }
 }

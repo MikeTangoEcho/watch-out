@@ -43,7 +43,22 @@ class WebmParse extends Command
         $stream = Storage::readStream($this->argument('file'));
         $webm = new Webm();
         $this->info('Read Webm');
-        $webm->read($stream);
+        $ebml = $webm->parse($stream);
+
+        //fclose($stream);return;
+        rewind($stream);
+        $this->info('Write Header Webm');
+        $header = fopen('php://temp', 'wb');
+        stream_copy_to_stream($stream, $header, $ebml['Cluster']['offset'] - 1);
+        Storage::put('stream-header.webm', $header);
+        fclose($header);
+
+        $this->info('Write Cluster Webm');
+        $cluster = fopen('php://temp', 'wb');
+        stream_copy_to_stream($stream, $cluster);
+        Storage::put('stream-cluster.webm', $cluster);
+        fclose($cluster);
+
         $this->info('Close stream');
         fclose($stream);
     }

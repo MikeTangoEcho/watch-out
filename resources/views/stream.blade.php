@@ -1,5 +1,9 @@
 @extends('layout.app')
 
+@push('scripts')
+<script src="{{ asset('js/streamer.js') }}"></script>
+@endpush
+
 
 @section('content')
     <video controls width="460" height="306" autoplay>
