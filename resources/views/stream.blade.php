@@ -6,7 +6,9 @@
 
 
 @section('content')
-    <video controls width="460" height="306" autoplay>
-        <source src="{{ route('stream.pull', ['ts' => now()->timestamp]) }}" type='video/webm'>
+    <video id="player" controls width="460" height="306" data-src="{{ route('stream.pull', ['ts' => now()->timestamp]) }}">
+    </video>
+
+    <video id="test" controls width="460" height="306" src="{{ route('stream.full', ['ts' => now()->timestamp]) }}">
     </video>
 @endsection

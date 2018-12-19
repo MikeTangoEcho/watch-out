@@ -1,111 +1,85 @@
 'use strict';
 
-var mediaRecorder;
-var recordedBlobs;
-var mediaStream;
+// https://w3c.github.io/media-source/#widl-MediaSource-addSourceBuffer-SourceBuffer-DOMString-type
+const playerVideo = document.querySelector('video#player');
+var videoUrl = playerVideo.getAttribute("data-src");
+var streamedBlobs = [];
+var currentChunk = 1;
+var mediaSource;
+var sourceBuffer;
 
-var constraints = {
-    audio: true,
-    video: true
-//    video: { width: 1280, height: 720 }
-}; 
-
-function handleDataAvailable(event) {
-  console.log('Pushed data');
-  if (event.data && event.data.size > 0) {
-    recordedBlobs.push(event.data);
-    // Push Data
-    // TODO mark uploaded records
-    axios.post('/stream', event.data, { headers: {
-      'X-Block-Chunk-Id': recordedBlobs.length,
-    }})
-      .then(function (response) {
-        console.log(response);
-      })
-      .catch(function (error) {
-        console.log(error);
-      });
-  }
+if (window.MediaSource) {
+  mediaSource = new MediaSource();
+  playerVideo.src = URL.createObjectURL(mediaSource);
+  mediaSource.addEventListener('sourceopen', sourceOpen);
+  mediaSource.addEventListener("sourceclose", function (e) {
+    console.log("FUCK close");
+    console.log(e);
+  });
+  mediaSource.addEventListener("sourceended", function (e) {
+    console.log("FUCK end");
+    console.log(e);
+  });
+} else {
+  console.log("The Media Source Extensions API is not supported.")
 }
 
-function startRecording() {
-  recordedBlobs = [];
-  var options = {
-//    audioBitsPerSecond : 128000,
-//    videoBitsPerSecond : 2500000,
-    mimeType: 'video/webm'
-  };
-
-  try {
-    mediaRecorder = new MediaRecorder(mediaStream, options);
-  } catch (e) {
-    console.error('Exception while creating MediaRecorder:', e);
+function readStream(e) {
+  //var sourceBuffer = e.target;
+  sourceBuffer.removeEventListener('updateend', readStream);
+  if (mediaSource.readyState !== "open") {
+    // Check error status
     return;
   }
-
-  console.log('Created MediaRecorder', mediaRecorder, 'with options', options);
-
-  mediaRecorder.onstop = (event) => {
-    console.log('Recorder stopped: ', event);
-  };
-  mediaRecorder.ondataavailable = handleDataAvailable;
-  mediaRecorder.start(2000); // Blob of 1 sec
-  console.log('MediaRecorder started', mediaRecorder);
-}
-
-function stopRecording() {
-  mediaRecorder.stop();
-  mediaStream.stop();
-  console.log('Recorded Blobs: ', recordedBlobs);
-}
-
-function handleSuccess(stream) {
-  console.log('getUserMedia() got stream:', stream);
-
-  // re-add the stop function
-  // Chrome deprecated stop function
-  if(!stream.stop && stream.getTracks) {
-    stream.stop = function(){         
-      this.getTracks().forEach(function (track) {
-         track.stop();
-      });
-    };
-  }
-
-  mediaStream = stream;
-  previewVideo.srcObject = stream;
-  startRecording();
-}
-
-function download() {
-    var blob = new Blob(recordedBlobs, {
-        type: 'video/webm'
+  // Stream
+  // Get next Block
+  // TODO retry with 404
+  axios.get(videoUrl, {
+    responseType: 'arraybuffer',
+    headers: { 'X-Block-Chunk-Id': currentChunk }
+  })
+    .then(function (response) {
+      console.log('Pulled Chunk ' + response.headers['x-block-chunk-id']);
+      currentChunk = Number(response.headers['x-block-chunk-id']) + 1;
+      streamedBlobs.push(response.data);
+      sourceBuffer.appendBuffer(response.data);
+      sourceBuffer.addEventListener('updateend', readStream);
+      if (playerVideo.paused) {
+        //console.log('Play');
+        //playerVideo.play();
+      }
+    })
+    .catch(function (error) {
+      // TODO wait if 404
+      console.log(error);
+      //closeStream();
     });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    document.body.appendChild(a);
-    a.style = 'display: none';
-    a.href = url;
-    a.download = 'test.webm';
-    a.click();
-    window.URL.revokeObjectURL(url);
 }
-  
-// Selectors
-const previewVideo = document.querySelector('video#preview');
-const recordButton = document.querySelector('button#record');
-const stopButton = document.querySelector('button#stop');
-const ddlButton = document.querySelector('button#download');
 
-// Event Listener
-recordButton.addEventListener('click', () => {
-    navigator.mediaDevices.getUserMedia(constraints)
-        .then(handleSuccess)
-        .catch(e => console.error('navigator.getUserMedia error:', e));    
-});
-stopButton.addEventListener('click', () => {
-    stopRecording();
-});
-ddlButton.addEventListener('click', () => {
-    download();
-});
+function sourceOpen(e) {
+  var mime = 'video/webm; codecs="vorbis,vp8"';
+  mediaSource = e.target;
+  sourceBuffer = mediaSource.addSourceBuffer(mime);
+  sourceBuffer.mode = "sequence";
+  sourceBuffer.addEventListener('update', function(e) {
+    console.log("Update");
+    console.log(e);
+  });
+
+  sourceBuffer.addEventListener('error', function(e) {
+    console.log("Error");
+    console.log(e);
+  });
+  sourceBuffer.addEventListener('abort', function(e) {
+    console.log("Abort"); 
+    console.log(e); 
+  });
+  readStream();
+}
+
+function closeStream() {
+  if (mediaSource.readyState === "open") {
+    mediaSource.endOfStream("network");
+  }  
+  URL.revokeObjectURL(playerVideo.src);
+}

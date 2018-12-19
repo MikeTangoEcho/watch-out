@@ -18,5 +18,7 @@ Route::get('/record', 'StreamController@record')
 
 Route::get('/stream', 'StreamController@pull')
     ->name('stream.pull');
+Route::get('/stream/full', 'StreamController@full')
+    ->name('stream.full');
 Route::post('/stream', 'StreamController@push')
     ->name('stream.push');

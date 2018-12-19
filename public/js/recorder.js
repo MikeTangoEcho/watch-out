@@ -35,7 +35,7 @@ function startRecording() {
 //    videoBitsPerSecond : 2500000,
     mimeType: 'video/webm'
   };
-
+// Force codec ? for stream reading ?
   try {
     mediaRecorder = new MediaRecorder(mediaStream, options);
   } catch (e) {

@@ -48,51 +48,71 @@ class StreamController extends Controller
         }        
     }
 
-    public function pull()
+    public function full(Request $request)
     {
-        // Change header of stream ?
-        // Inject ADS in init segment
-        return response()->stream(function() {
-            // Forge file
-            //https://chromium.googlesource.com/webm/libvpx/+/master/webmdec.h
-            // https://www.w3.org/TR/media-source/#init-segment
-            // TODO: query DB to b check if need to switch file
-            Log::debug("Send stream header");
-            if (Storage::exists("stream-header.webm")) {
-                $stream = Storage::readStream("stream-header.webm");
-                fpassthru($stream);
-                fclose($stream);
-            } else {
-                Log::debug('No stream found');
-                return;
-            }
+        $filesToStream = ["stream-header.webm"] +  preg_grep("/stream-\d+.webm/", Storage::files());
 
-            if ($request->header('X-Block-Chunk-Id')) {
-                $current_id = $request->header('X-Block-Chunk-Id');
-            } else {
-                $files = preg_grep("/stream-\d+.webm/", Storage::files());
-                if (!$files) {
-                    Log::debug("No segments found");
-                    return;
-                }
-                Log::debug($files);
-                $matches = [];
-                if (preg_match("/stream-(?P<id>\d+).webm/", end($files), $matches)) {
-                    Log::debug("Segments catchup " . $current_id);
-                    $current_id = $matches['id'];
-                }
-            }
-            // Get Asked segment
-            if (Storage::exists("stream-" . $current_id . ".webm")) {
-                Log::debug("Segment sent " . $current_id);
-                $stream = Storage::readStream("stream-" . $current_id . ".webm");    
-                fpassthru($stream);
-                fclose($stream);
+        return response()->stream(function() use ($filesToStream) {
+            // Forge file
+            foreach ($filesToStream as $file) {
+                if (Storage::exists($file)) {
+                    $stream = Storage::readStream($file);
+                    fpassthru($stream);
+                    fclose($stream);
+                }    
             }
         }, 200, [
             'Cache-Control'         => 'must-revalidate, no-cache, no-store',
             'Content-Type'          => 'video/webm',
             'Pragma'                => 'public',
+        ]);
+    }
+
+    public function pull(Request $request)
+    {
+        $filesToStream = [];
+        // Change header of stream ?
+        // Inject ADS in init segment
+        // TODO Send blocks until last
+        if (intval($request->header('X-Block-Chunk-Id'))) {
+            $current_id = intval($request->header('X-Block-Chunk-Id'));
+        } else {
+            $filesToStream[] = "stream-header.webm";
+            $files = preg_grep("/stream-\d+.webm/", Storage::files());
+            if (!$files) {
+                Log::debug("No segments found");
+                return;
+            }
+            $matches = [];
+            if (preg_match("/stream-(?P<id>\d+).webm/", end($files), $matches)) {
+                $current_id = $matches['id'];
+            }
+            // TEST
+            $current_id = 1;
+            Log::debug("Segments catchup " . $current_id);
+        }
+        // Get Asked segment
+        $filesToStream[] = "stream-" . $current_id . ".webm";
+        $filesToStream = ['stream-full.webm'];
+        return response()->stream(function() use ($filesToStream) {
+            // Forge file
+            //https://chromium.googlesource.com/webm/libvpx/+/master/webmdec.h
+            // https://www.w3.org/TR/media-source/#init-segment
+            // TODO: query DB to b check if need to switch file
+            foreach ($filesToStream as $file) {
+                if (Storage::exists($file)) {
+                    $stream = Storage::readStream($file);
+                    fpassthru($stream);
+                    fclose($stream);
+                } else {
+                    abort(404);
+                }
+            }
+        }, 200, [
+            'Cache-Control'         => 'must-revalidate, no-cache, no-store',
+            'Content-Type'          => 'video/webm',
+            'Pragma'                => 'public',
+            'X-Block-Chunk-Id'      => $current_id
         ]);
     }
 }

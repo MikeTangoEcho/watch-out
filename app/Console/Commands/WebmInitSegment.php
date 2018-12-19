@@ -7,21 +7,21 @@ use Illuminate\Support\Facades\Storage;
 
 use App\Lib\Webm;
 
-class WebmParse extends Command
+class WebmInitSegment extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'webm:parse {file}';
+    protected $signature = 'webm:init-segment {file}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Parse webm file';
+    protected $description = 'Extract init segment from webm byte stream';
 
     /**
      * Create a new command instance.
@@ -45,7 +45,21 @@ class WebmParse extends Command
         $webm->debug = True;
         $this->info('Read Webm');
         $ebml = $webm->parse($stream);
+
+        rewind($stream);
+        $this->info('Write Header Webm');
+        $header = fopen('php://temp', 'wb');
+        stream_copy_to_stream($stream, $header, $ebml['Cluster']['offset']);
+        Storage::put('stream-header.webm', $header);
+        fclose($header);
+
+        $this->info('Write Cluster Webm');
+        $cluster = fopen('php://temp', 'wb');
+        stream_copy_to_stream($stream, $cluster);
+        Storage::put('stream-cluster.webm', $cluster);
+        fclose($cluster);
+
+        $this->info('Close stream');
         fclose($stream);
-        var_dump($ebml);
     }
 }
