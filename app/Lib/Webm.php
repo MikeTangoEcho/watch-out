@@ -8,7 +8,7 @@ class Webm
 
     // https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/common/webmids.h
 
-    private $ebmlStruct = [
+    public $ebmlStruct = [
         '1a45dfa3' => [
             'name' => 'EBMLHeader',
             'format' => 'master',
@@ -100,12 +100,12 @@ class Webm
                 ],
                 '1654ae6b' => [
                     'name' => 'Tracks',
-                    'format' => 'str',
+                    'format' => 'master',
                     'multiple' => true,
                     'struct' => [
                         'ae' => [
                             'name' => 'TrackEntry',
-                            'format' => 'str',
+                            'format' => 'master',
                             'mandatory' => true,
                             'multiple' => true,
                             'struct' => [
@@ -331,28 +331,28 @@ class Webm
     public function parseElements($stream, $struct, $structMaxOffset=-1, $extractData=false, $extractNested=false)
     {
         $elements = [];
-        $this->log(array_keys($struct));
-        while (!feof($stream) && ($structMaxOffset < ftell($stream))) {
+        while (!feof($stream) && (ftell($stream) < $structMaxOffset  || $structMaxOffset == -1)) {
             // Read Id
             $tagStart = ftell($stream);
             $id = $this->readId($stream);
+            if (!$id) {
+                // TODO feof is false but cant read char
+                break;
+            }
             $valueLength = $this->getUIntLength($stream);
             $valueStart = ftell($stream);
             $element = [
                 'offset' => $tagStart,
                 'valueOffset' => $valueStart,
-                'valueLength' => $valueLength,
-                'value' => null,
+                'valueLength' => $valueLength
             ];
             $this->log(bin2hex($id));
-            $this->log(isset($struct[bin2hex($id)]));
             if (isset($struct[bin2hex($id)])) {
                 $elementStruct = $struct[bin2hex($id)];
                 $this->log('Found Id [' . bin2hex($id) . '] ' . $elementStruct['name']);
                 if ($elementStruct['format'] == 'master') {
-                    $this->log('Next');
+                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] .  ":O:" . $tagStart . ":L:" . $valueLength);
                     // Recursiv
-                    $this->log(array_keys($elementStruct['struct']));
                     $element['elements'] = $this->parseElements($stream, $elementStruct['struct'],
                         $valueLength != -1 ? $valueStart + $valueLength : -1,
                         $extractData, $extractNested);
@@ -367,17 +367,50 @@ class Webm
                         $value = $this->formatValue($elementStruct['format'], fread($stream, $valueLength));
                     }
                     $element['value'] = $value;
-                }
-                $this->log(bin2hex($id) . ":O:" . $tagStart . ":L:" . $valueLength . ":V:" . $element['value']);
+                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] .  ":O:" . $tagStart . ":L:" . $valueLength . ":V:" . $element['value']);
+                }                
                 // TODO Check Multiple
-                $elements[$elementStruct['name']] = $element;
+                if (isset($elementStruct['multiple'])) {
+                    if (isset($elements[$elementStruct['name']])) {
+                        $elements[$elementStruct['name']][] = $element;
+                    } else {
+                        $elements[$elementStruct['name']] = [$element];
+                    }
+                } else {
+                    $elements[$elementStruct['name']] = $element;
+                }                
             } else {
-                $this->log(array_keys($struct));
                 $this->log('Ignored Id [' . bin2hex($id) . ']');
+                fseek($stream, $valueStart + $valueLength);
             }
         }
-        $this->log('RETURN');
         return $elements;
+    }
+
+    /**
+     * Return pos of Next cluster
+     */
+    public function seekNextId($stream, $hexTagId)
+    {
+        $tag = hex2bin($hexTagId);
+        $tagSize = strlen($tag);
+        $successChain = 0;
+        while (!feof($stream) && ($successChain < $tagSize)) {
+            $char = fgetc($stream);
+            if ($char === $tag[$successChain]) {
+                $this->log("Found [" . bin2hex($char) . "] at " . dechex(ftell($stream)));
+                $successChain++;
+            } else {
+                if ($successChain) {
+                    $this->log('Missmatch');
+                }
+                $successChain = 0;
+            }
+        }
+        if ($successChain == $tagSize) {
+            return ftell($stream) - $tagSize;
+        }
+        return false;
     }
 
     /**
@@ -386,61 +419,7 @@ class Webm
     public function parse($stream, $extractData=false, $extractNested=false)
     {
         $ebml = $this->parseElements($stream, $this->ebmlStruct, -1, $extractData, $extractNested);
-        $this->log($ebml);
-        return $ebml;
-    }
-
-    /**
-     * Extract the header from the first tracks to allow replay at anytime
-     */
-    public function oparse($stream, $extractData=false, $extractNested=false)
-    {
-        // Look for EBML header
-        $pos = 0;
-        $ebmlHeader = $this->readId($stream);
-        if (bin2hex($ebmlHeader) != $this->kMkvEBML) {
-            throw new \Exception("Invalid file format");
-        }
-        // Read the EBML header size.
-        $ebmlHeaderSizeLength = $this->getUIntLength($stream);
-        $ebml = [
-            'EBMLHeaderOffset' => ftell($stream),
-            'EBMLHeaderSize' => $ebmlHeaderSizeLength,            
-        ];
-        while (!feof($stream)) {
-            $tagStart = ftell($stream);
-            $id = $this->readId($stream);
-            $valueLength = $this->getUIntLength($stream);
-            $valueStart = ftell($stream);
-            if ($valueLength == -1) { // Unknown sizen
-                $value = "Unkown";
-            } else if ($valueLength == 0) {
-                $value = null;
-            } else {
-                $value = fread($stream, $valueLength);
-            }
-            $this->log(bin2hex($id) . ":L:" . $valueLength . ":V:" . substr(bin2hex($value), 0, 20));
-            if (isset($this->ebmlStruct[bin2hex($id)])) {
-                $struct = $this->ebmlStruct[bin2hex($id)];
-                $ebml[$struct['name']] = [
-                    'offset' => $tagStart,
-                    'valueOffset' => $valueStart,
-                    'valueLength' => $valueLength,
-                    'value' => ($struct['format'] == 'int' ?
-                        $this->UnserializeUInt($value) : substr($value, 0, 25))
-                ];
-            } else if ($id) {
-                $this->log($ebml);
-                $ebml[bin2hex($id)] = [
-                    'offset' => $tagStart,
-                    'valueOffset' => $valueStart,
-                    'valueLength' => $valueLength,
-                    'value' => substr($value, 0, 25)
-                ];
-                //throw new \Exception('Unknown element Id ' . bin2hex($id));
-            }
-        }
-        $this->log($ebml);
         return $ebml;
     }
 }
+

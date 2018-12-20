@@ -6,7 +6,7 @@
 
 
 @section('content')
-    <video id="player" controls width="460" height="306" data-src="{{ route('stream.pull', ['ts' => now()->timestamp]) }}">
+    <video id="player" controls width="460" height="306" autoplay data-src="{{ route('stream.pull', ['ts' => now()->timestamp]) }}">
     </video>
 
     <video id="test" controls width="460" height="306" src="{{ route('stream.full', ['ts' => now()->timestamp]) }}">

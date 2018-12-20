@@ -49,7 +49,7 @@ class WebmInitSegment extends Command
         rewind($stream);
         $this->info('Write Header Webm');
         $header = fopen('php://temp', 'wb');
-        stream_copy_to_stream($stream, $header, $ebml['Cluster']['offset']);
+        stream_copy_to_stream($stream, $header, $ebml['Segment']['elements']['Cluster'][0]['offset']);
         Storage::put('stream-header.webm', $header);
         fclose($header);
 

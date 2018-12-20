@@ -33,7 +33,7 @@ function startRecording() {
   var options = {
 //    audioBitsPerSecond : 128000,
 //    videoBitsPerSecond : 2500000,
-    mimeType: 'video/webm'
+    mimeType: 'video/webm;codecs="opus,vp9"',
   };
 // Force codec ? for stream reading ?
   try {
@@ -49,7 +49,8 @@ function startRecording() {
     console.log('Recorder stopped: ', event);
   };
   mediaRecorder.ondataavailable = handleDataAvailable;
-  mediaRecorder.start(2000); // Blob of 1 sec
+  // Chrome give us avg 1 Cluster every 12s
+  mediaRecorder.start(2000);
   console.log('MediaRecorder started', mediaRecorder);
 }
 
@@ -79,7 +80,7 @@ function handleSuccess(stream) {
 
 function download() {
     var blob = new Blob(recordedBlobs, {
-        type: 'video/webm'
+        type: 'video/webm; codec="opus, VP8"'
     });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');

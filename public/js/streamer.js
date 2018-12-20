@@ -4,7 +4,9 @@
 const playerVideo = document.querySelector('video#player');
 var videoUrl = playerVideo.getAttribute("data-src");
 var streamedBlobs = [];
-var currentChunk = 1;
+var nextChunk = 0;
+var sequenceChunk = 1;
+var waitCounter = 0;
 var mediaSource;
 var sourceBuffer;
 
@@ -36,38 +38,50 @@ function readStream(e) {
   // TODO retry with 404
   axios.get(videoUrl, {
     responseType: 'arraybuffer',
-    headers: { 'X-Block-Chunk-Id': currentChunk }
+    headers: { 'X-Block-Chunk-Id': nextChunk, 'X-Sequence-Chunk-Id': sequenceChunk }
   })
     .then(function (response) {
-      console.log('Pulled Chunk ' + response.headers['x-block-chunk-id']);
-      currentChunk = Number(response.headers['x-block-chunk-id']) + 1;
-      streamedBlobs.push(response.data);
-      sourceBuffer.appendBuffer(response.data);
-      sourceBuffer.addEventListener('updateend', readStream);
-      if (playerVideo.paused) {
-        //console.log('Play');
-        //playerVideo.play();
+      if (response.status == "200") {
+        waitCounter = 0;
+        // TODO Nothing if stuck on block 0
+        console.log('Pulled Chunk ' + response.headers['x-block-chunk-id']);
+        nextChunk = Number(response.headers['x-block-next-chunk-id']);
+        streamedBlobs.push(response.data);
+        sourceBuffer.appendBuffer(response.data);
+        console.log('Chunk Sequence ' + sequenceChunk);
+        sequenceChunk += 1;
+        sourceBuffer.addEventListener('updateend', readStream);
+        // TODO Check AUTOplay
+      } else if (response.status == "204") {
+        if (waitCounter > 20) {
+          closeStream();
+        }
+        console.log('Wait for next Chunk ' + nextChunk);
+        // Need to wait until we get more chunk
+        waitCounter++;
+        setTimeout(readStream, response.headers['retry-after'] * 1000);
       }
     })
     .catch(function (error) {
-      // TODO wait if 404
       console.log(error);
-      //closeStream();
+      closeStream();
     });
 }
 
 function sourceOpen(e) {
-  var mime = 'video/webm; codecs="vorbis,vp8"';
+  var mime = 'video/webm;codecs="opus,vp9"';
+//  var mime = 'video/mp4';
   mediaSource = e.target;
   sourceBuffer = mediaSource.addSourceBuffer(mime);
   sourceBuffer.mode = "sequence";
   sourceBuffer.addEventListener('update', function(e) {
-    console.log("Update");
+    console.log("Buffer updated");
     console.log(e);
   });
 
   sourceBuffer.addEventListener('error', function(e) {
-    console.log("Error");
+    console.log("Buffer error");
+    // chrome://media-internals/
     console.log(e);
   });
   sourceBuffer.addEventListener('abort', function(e) {
@@ -80,6 +94,6 @@ function sourceOpen(e) {
 function closeStream() {
   if (mediaSource.readyState === "open") {
     mediaSource.endOfStream("network");
-  }  
+  }
   URL.revokeObjectURL(playerVideo.src);
 }

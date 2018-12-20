@@ -7,21 +7,21 @@ use Illuminate\Support\Facades\Storage;
 
 use App\Lib\Webm;
 
-class WebmParse extends Command
+class WebmSeek extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'webm:parse {file} {--segment}';
+    protected $signature = 'webm:seek {file} {hextag}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Parse webm file';
+    protected $description = 'Seek Tag in webm file';
 
     /**
      * Create a new command instance.
@@ -44,7 +44,7 @@ class WebmParse extends Command
         $webm = new Webm();
         $webm->debug = True;
         $this->info('Read Webm');
-        $ebml = $webm->parse($stream);
+        $ebml = $webm->seekNextId($stream, $this->argument('hextag'));
         fclose($stream);
         var_dump($ebml);
     }
