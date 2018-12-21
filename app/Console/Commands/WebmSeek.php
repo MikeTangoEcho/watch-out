@@ -14,7 +14,7 @@ class WebmSeek extends Command
      *
      * @var string
      */
-    protected $signature = 'webm:seek {file} {hextag}';
+    protected $signature = 'webm:seek {file} {hextag} {{--split}}';
 
     /**
      * The console command description.
@@ -42,10 +42,31 @@ class WebmSeek extends Command
     {
         $stream = Storage::readStream($this->argument('file'));
         $webm = new Webm();
-        $webm->debug = True;
+        //$webm->debug = True;
+        $offset = 0;
+        $splitId = 1;
         $this->info('Read Webm');
-        $ebml = $webm->seekNextId($stream, $this->argument('hextag'));
-        fclose($stream);
-        var_dump($ebml);
+        while ($pos = $webm->seekNextId($stream, $this->argument('hextag'))) {
+            var_dump($pos);
+            var_dump(dechex($pos));
+            if ($this->option('split')) {
+                $tmp = fopen("php://temp", "wb");
+                fseek($stream, 0);
+                stream_copy_to_stream($stream, $tmp, $pos);
+                Storage::put($this->argument('file') . "-" . $splitId, $tmp);
+                fclose($tmp);
+                $offset = $pos;
+                $splitId++;
+                // Avoid inf loop
+                fseek($stream, $offset + 1);
+            }
+        }
+        if ($offset) {
+            $tmp = fopen("php://temp", "wb");
+            stream_copy_to_stream($stream, $tmp, $pos - $offset, $offset);
+            Storage::put($this->argument('file') . "-" . $splitId, $tmp);
+            fclose($tmp);
+        }
+        fclose($stream);        
     }
 }

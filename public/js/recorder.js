@@ -3,6 +3,7 @@
 var mediaRecorder;
 var recordedBlobs;
 var mediaStream;
+var mimeType;
 
 var constraints = {
     audio: true,
@@ -23,9 +24,29 @@ function handleDataAvailable(event) {
         console.log(response);
       })
       .catch(function (error) {
+        // TODO Retry
         console.log(error);
+        stopRecording();
       });
   }
+}
+
+function getSupportedMimeType() {
+  // Ordered by priority
+  var types = [
+    'video/webm;codecs="opus,vp9"',
+    'video/webm;codecs="opus,vp8"',
+    'video/webm;codecs="opus,h264"',
+    'video/mpeg'
+  ];
+  for (var i in types) { 
+    if (MediaRecorder.isTypeSupported(types[i])) {
+      console.log("MimeType " + types[i] + " is supported");
+      return types[i];
+    }
+    console.log("MimeType " + types[i] + " is NOT supported");
+  }
+  return false;
 }
 
 function startRecording() {
@@ -33,7 +54,7 @@ function startRecording() {
   var options = {
 //    audioBitsPerSecond : 128000,
 //    videoBitsPerSecond : 2500000,
-    mimeType: 'video/webm;codecs="opus,vp9"',
+    mimeType: mimeType,
   };
 // Force codec ? for stream reading ?
   try {
@@ -55,7 +76,9 @@ function startRecording() {
 }
 
 function stopRecording() {
-  mediaRecorder.stop();
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
   mediaStream.stop();
   console.log('Recorded Blobs: ', recordedBlobs);
 }
@@ -80,7 +103,7 @@ function handleSuccess(stream) {
 
 function download() {
     var blob = new Blob(recordedBlobs, {
-        type: 'video/webm; codec="opus, VP8"'
+        type: mimeType
     });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -100,9 +123,10 @@ const ddlButton = document.querySelector('button#download');
 
 // Event Listener
 recordButton.addEventListener('click', () => {
-    navigator.mediaDevices.getUserMedia(constraints)
-        .then(handleSuccess)
-        .catch(e => console.error('navigator.getUserMedia error:', e));    
+  mimeType = getSupportedMimeType();
+  navigator.mediaDevices.getUserMedia(constraints)
+      .then(handleSuccess)
+      .catch(e => console.error('navigator.getUserMedia error:', e));    
 });
 stopButton.addEventListener('click', () => {
     stopRecording();

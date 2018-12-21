@@ -6,6 +6,7 @@ use App\Lib\Webm;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use App\StreamChunk;
 
 class StreamController extends Controller
 {
@@ -19,8 +20,8 @@ class StreamController extends Controller
         return view('record');
     }
 
-    private function getStreamName($id, $hasCluster=false) {
-        return "stream-" . str_pad($id, 8, "0", STR_PAD_LEFT) . ($hasCluster ? "-cluster" : null) . ".webm";
+    private function getStreamName($id, $clusterPos=false) {
+        return "stream-" . str_pad($id, 8, "0", STR_PAD_LEFT) . ($clusterPos ? "-cluster-" . $clusterPos : "-chunk") . ".webm";
     }
 
     public function push(Request $request)
@@ -30,41 +31,53 @@ class StreamController extends Controller
         // TODO Check if stream is in progress
         // TODO Split stream by cluster
         // TODO Manage manifest of stream
-        if ($request->header('X-Block-Chunk-Id') == 1) {
-            $webm = new Webm();
-            $stream = fopen('php://temp', 'rwb');
-            fwrite($stream, $request->getContent());
-            rewind($stream);
-            $ebml = $webm->parse($stream);
-            rewind($stream);
-            
+        // Start with EBML header => look for next cluter and split
+        // Not start with Cluster => look for next cluster and split by timecode, begin will be appended to last file
+
+        $stream = fopen('php://temp', 'rwb');
+        fwrite($stream, $request->getContent());
+        rewind($stream);
+        $webm = new Webm();
+        // Get Pos of first Cluster
+        $clusterPos = $webm->seekNextId($stream, '1f43b675');
+        rewind($stream);
+        $chunkId = $request->header('X-Block-Chunk-Id');
+        // Check if Init
+        if ($chunkId == 1) {
+            // Can have cluster or not
             $header = fopen('php://temp', 'wb');
-            stream_copy_to_stream($stream, $header, $ebml['Segment']['elements']['Cluster'][0]['offset']);
+            stream_copy_to_stream($stream, $header, intval($clusterPos) -1, 0);
             Storage::put('stream-header.webm', $header);
             fclose($header);
             Log::debug('Stream Header');
-            
-            $cluster = fopen('php://temp', 'wb');
-            stream_copy_to_stream($stream, $cluster);
-            Storage::put($this->getStreamName($request->header('X-Block-Chunk-Id'), true), $cluster);
-            fclose($cluster);
-            fclose($stream);    
-            Log::debug('Stream First Cluster');
-        } else {
-            $webm = new Webm();
-            $stream = fopen('php://temp', 'rwb');
-            fwrite($stream, $request->getContent());
-            rewind($stream);
-            $pos = $webm->seekNextId($stream, '1f43b675');
-            Storage::put($this->getStreamName($request->header('X-Block-Chunk-Id'), $pos), $stream);
-            fclose($stream);
-            Log::debug('Received Chunk ' . $request->header('X-Block-Chunk-Id') . ($pos ? ' cluster' : null));
+            $streamChunk = new StreamChunk();
+            $streamChunk->stream_id = 1;
+            $streamChunk->chunk_id = 0;
+            $streamChunk->filename = 'stream-header.webm';
+            $streamChunk->save();
+            $clusterPos = 1;
         }
+        // If not eof write chunk and flag if cluster
+        if (!feof($stream)) {
+            $chunk = fopen('php://temp', 'wb');
+            stream_copy_to_stream($stream, $chunk);
+            Storage::put($this->getStreamName($chunkId, $clusterPos), $chunk);
+            fclose($chunk);
+            Log::debug('Stream Chunk ' . $chunkId);
+            $streamChunk = new StreamChunk();
+            $streamChunk->stream_id = 1;
+            $streamChunk->chunk_id = $chunkId;
+            $streamChunk->filename = $this->getStreamName($chunkId, $clusterPos);
+            if (is_int($clusterPos))
+                $streamChunk->cluster_offset = $clusterPos - 1;
+            $streamChunk->save();
+        }
+        fclose($stream);
     }
 
     public function full(Request $request)
     {
-        $filesToStream = ["stream-header.webm"] +  preg_grep("/stream-\d+.webm/", Storage::files());
+        $filesToStream = ["stream-header.webm"] +  preg_grep("/stream-\d+-\.+.webm/", Storage::files());
 
         return response()->stream(function() use ($filesToStream) {
             // Forge file
@@ -88,59 +101,73 @@ class StreamController extends Controller
         // Change header of stream ?
         // Inject ADS in init segment
         // TODO Send blocks until last
-        $next_chunck_id = 0;
+        $nextChunkId = 0;
+        $clusterPos = 0;
         $sequence_chunk =  intval($request->header('X-Sequence-Chunk-Id'));
-        $chunck_id = intval($request->header('X-Block-Chunk-Id'));
-        if ($chunck_id) {
-            if (Storage::exists($this->getStreamName($chunck_id)))
-                $filesToStream[] = $this->getStreamName($chunck_id);
-            else
-                $filesToStream[] = $this->getStreamName($chunck_id, true);
-            $next_chunck_id = $chunck_id + 1;
+        $chunkId = intval($request->header('X-Block-Chunk-Id'));
+        if ($chunkId) {
+            // TODO Add flag for seeking next cluster
+            $streamChunk = StreamChunk::where('stream_id', 1)
+                ->where('chunk_id', '=', $chunkId)
+                ->first();
+            if ($streamChunk) {
+                $filesToStream[] = $streamChunk->filename;
+                $clusterPos = $streamChunk->cluster_offset;
+                $nextChunkId = $chunkId + 1;
+            } else {
+                // Chunk is not yet Available
+                $nextChunkId = $chunkId;
+            }
         } else {
-            $filesToStream[] = "stream-header.webm";
-            // Get Last Id
-            $files = preg_grep("/stream-\d+-cluster.webm/", Storage::files());
-            if (!$files) {
-                Log::debug("No segments found");
-                return;
+            $streamChunk = StreamChunk::where('stream_id', 1)
+                ->where('chunk_id', '=', $chunkId)
+                ->first();
+            if ($streamChunk) {
+                $filesToStream[] = $streamChunk->filename;
+                // Next Cluster
+                $streamChunk = StreamChunk::where('stream_id', 1)
+                    ->whereNotNull('cluster_offset')
+                    ->orderBy('chunk_id', 'desc')
+                    ->first();
+                
+                if ($streamChunk) {
+                    $nextChunkId = $streamChunk->chunk_id;
+                }
+                Log::debug("Sent Init Segments with next Chunk " . $nextChunkId);
+            } else {
+                // Stream not started
             }
-            $matches = [];
-            if (preg_match("/stream-(?P<id>\d+)-cluster.webm/", end($files), $matches)) {
-                $next_chunck_id = intval($matches['id']);
-            }
-            //$next_chunck_id = 49;
-            Log::debug("Sent Init Segments with next Chunk " . $next_chunck_id);
         }
         
-        return response()->stream(function() use ($filesToStream, $sequence_chunk) {
+        return response()->stream(function() use ($filesToStream, $sequence_chunk, $clusterPos) {
             //https://chromium.googlesource.com/webm/libvpx/+/master/webmdec.h
             // https://www.w3.org/TR/media-source/#init-segment
             // TODO: query DB to b check if need to switch file
-            foreach ($filesToStream as $file) {
-                if (Storage::exists($file)) {
-                    $stream = Storage::readStream($file);
-                    Log::debug('Sent ' . $file);
-                    if ($sequence_chunk == 2) {
-                        // Seek first cluster because fuck chrome
-                        // Its Buffer management sucks
-                        $webm = new Webm();
-                        $pos = $webm->seekNextId($stream, '1f43b675');
-                        Log::debug('Seek Cluster at ' . $pos);
-                        fseek($stream, $pos, SEEK_SET);
-                    }                    
-                    fpassthru($stream);
-                    fclose($stream);
-                } else {
-                    abort(204);
+            if ($filesToStream) {
+                foreach ($filesToStream as $file) {
+                    if (Storage::exists($file)) {
+                        $stream = Storage::readStream($file);
+                        Log::debug('Sent ' . $file);
+                        // TODO Check first loop
+                        if ($sequence_chunk == 1) {
+                            fseek($stream, $clusterPos);
+                            Log::debug('Seek Cluster at ' . $clusterPos);
+                        }                    
+                        fpassthru($stream);
+                        fclose($stream);
+                    } else {
+                        abort(204);
+                    }
                 }
+            } else {
+                abort(204);
             }
         }, 200, [
             'Cache-Control'         => 'must-revalidate, no-cache, no-store',
             'Content-Type'          => 'video/webm',
             'Pragma'                => 'public',
-            'X-Block-Chunk-Id'      => $chunck_id,
-            'X-Block-Next-Chunk-Id' => $next_chunck_id,
+            'X-Block-Chunk-Id'      => $chunkId,
+            'X-Block-Next-Chunk-Id' => $nextChunkId,
             'Retry-After'           => 2
         ]);
     }

@@ -5,7 +5,7 @@ const playerVideo = document.querySelector('video#player');
 var videoUrl = playerVideo.getAttribute("data-src");
 var streamedBlobs = [];
 var nextChunk = 0;
-var sequenceChunk = 1;
+var sequenceChunk = 0;
 var waitCounter = 0;
 var mediaSource;
 var sourceBuffer;
@@ -96,4 +96,8 @@ function closeStream() {
     mediaSource.endOfStream("network");
   }
   URL.revokeObjectURL(playerVideo.src);
+  // waitCounter = 0;
+  // nextChunk = 0;
+  // sequenceChunk = 0;
+  // playerVideo.src = URL.createObjectURL(mediaSource);
 }
