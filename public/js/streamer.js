@@ -114,6 +114,8 @@ class Streamer {
   }
 }
 
+// MAIN
+
 // TODO Delegate to openStream on each new elements
 var streamersElements = document.getElementsByClassName('streamer');
 var streamers = Array.prototype.map.call(streamersElements, function(e){

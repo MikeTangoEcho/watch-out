@@ -19,7 +19,7 @@ class StreamController extends Controller
     public function index()
     {
         $streams = Stream::orderBy('updated_at', 'desc')
-            //->limit(1)
+            ->limit(1)
             ->get();
         return view('streams', ['streams' => $streams]);
     }
@@ -125,6 +125,8 @@ class StreamController extends Controller
         rewind($fStream);
         $chunkId = $request->header('X-Chunk-Order');
         // Check if Init
+        // TODO Insert if not exists or prevent insertion of Chunk in wrong order
+        // Check if first bytes is the EMBL Header
         if ($chunkId == 1) {
             $streamChunk = new StreamChunk();
             $streamChunk->stream_id = $stream->id;

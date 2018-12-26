@@ -1,5 +1,5 @@
 <h4>{{ $stream->id }} - {{ $stream->title }}</h4>
-<video id="player"
+<video
     class="streamer"
     muted
     width="240"
