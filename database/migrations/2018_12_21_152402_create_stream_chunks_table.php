@@ -20,6 +20,8 @@ class CreateStreamChunksTable extends Migration
             $table->string('filename');
             $table->unsignedInteger('cluster_offset')->nullable();
             $table->timestamps();
+
+            $table->foreign('stream_id')->references('id')->on('streams')->onDelete('cascade');
         });
     }
 
@@ -30,6 +32,9 @@ class CreateStreamChunksTable extends Migration
      */
     public function down()
     {
+        Schema::table('stream_chunks', function (Blueprint $table) {
+            $table->dropForeign(['stream_id']);
+        });
         Schema::dropIfExists('stream_chunks');
     }
 }

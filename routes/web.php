@@ -11,14 +11,14 @@
 |
 */
 
-Route::get('/', 'StreamController@index')
-    ->name('stream.index');
 Route::get('/record', 'StreamController@record')
     ->name('stream.record');
 
-Route::get('/stream', 'StreamController@pull')
-    ->name('stream.pull');
-Route::get('/stream/full', 'StreamController@full')
+
+Route::resource('streams', 'StreamController');
+Route::get('/stream/{stream}/full', 'StreamController@full')
     ->name('stream.full');
-Route::post('/stream', 'StreamController@push')
+Route::get('/streams/{stream}/chunks', 'StreamController@pull')
+    ->name('stream.pull');
+Route::post('/streams/{stream}/chunks', 'StreamController@push')
     ->name('stream.push');

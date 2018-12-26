@@ -201,6 +201,10 @@ class Webm
                                             'format' => 'uint',
                                             'mandatory' => true
                                         ],
+                                        '54b3' => [
+                                            'name' => 'AspectRatioType',
+                                            'format' => 'uint',
+                                        ],
                                     ]
                                 ],
                                 'e1' => [
@@ -229,14 +233,42 @@ class Webm
                 ],
                 '1f43b675' => [
                     'name' => 'Cluster',
-                    'format' => 'str',
+                    'format' => 'master',
                     'multiple' => true,
                     'struct' => [
                         'e7' => [
                             'name' => 'Timecode',
-                            'format' => 'str',
+                            'format' => 'uint',
                             'mandatory' => true
-                        ]        
+                        ],
+                        'a7' => [
+                            'name' => 'Position',
+                            'format' => 'uint',
+                            'mandatory' => false
+                        ],
+                        'a3' => [
+                            'name' => 'SimpleBlock',
+                            'format' => 'bin',
+                            'mandatory' => false,
+                            'multiple' => true
+                        ],
+                        'a0' => [
+                            'name' => 'BlockGroup',
+                            'format' => 'master',
+                            'mandatory' => false,
+                            'multiple' => true,
+                            'struct' => [
+                                'a1' => [
+                                    'name' => 'Block',
+                                    'format' => 'bin',
+                                    'mandatory' => true,
+                                ],
+                                '9b' => [
+                                    'name' => 'BlockDuration',
+                                    'format' => 'uint',
+                                ],
+                            ]
+                        ],
                     ]
                 ],
                 '1c53bb6b' => [
@@ -267,8 +299,9 @@ class Webm
                 return $this->UnserializeUInt($value);
             case 'str':
             case 'utf8str':
-            case 'bin':
                 return substr($value, 0, 25);
+            case 'bin':
+                return bin2hex(substr($value, 0, 25));
         }
     }
 
@@ -317,7 +350,11 @@ class Webm
     }
 
     private function UnserializeUInt($bin) {
-        return unpack('C', $bin)[1];
+        $bin = str_pad($bin, 4, chr(0), STR_PAD_LEFT);
+        $r = unpack('N', $bin);
+        if (is_array($r))
+            return $r[1];
+        return $r;
     }
 
     private function log($o) {
@@ -408,9 +445,9 @@ class Webm
             }
         }
         if ($successChain == $tagSize) {
-            return ftell($stream) - $tagSize;
+            return ftell($stream) - $tagSize; // Offset
         }
-        return false;
+        return null;
     }
 
     /**

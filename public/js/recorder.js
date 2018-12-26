@@ -1,35 +1,5 @@
 'use strict';
 
-var mediaRecorder;
-var recordedBlobs;
-var mediaStream;
-var mimeType;
-
-var constraints = {
-    audio: true,
-    video: true
-//    video: { width: 1280, height: 720 }
-}; 
-
-function handleDataAvailable(event) {
-  console.log('Pushed data');
-  if (event.data && event.data.size > 0) {
-    recordedBlobs.push(event.data);
-    // Push Data
-    // TODO mark uploaded records
-    axios.post('/stream', event.data, { headers: {
-      'X-Block-Chunk-Id': recordedBlobs.length,
-    }})
-      .then(function (response) {
-        console.log(response);
-      })
-      .catch(function (error) {
-        // TODO Retry
-        console.log(error);
-        stopRecording();
-      });
-  }
-}
 
 function getSupportedMimeType() {
   // Ordered by priority
@@ -49,14 +19,55 @@ function getSupportedMimeType() {
   return false;
 }
 
+var mediaRecorder;
+var recordedBlobs;
+var mediaStream;
+var mimeType;
+
+var constraints = {
+    audio: true,
+//    video: true
+    video: { 
+      width: { min: 640, ideal: 640 },
+      height: { min: 480, ideal: 480 }
+    }
+};
+
+// Selectors
+const previewVideo = document.querySelector('video#preview');
+const videoUrl = previewVideo.getAttribute("data-src");
+var videoMimeType = previewVideo.getAttribute("data-mime-type");
+const recordButton = document.querySelector('button#record');
+const stopButton = document.querySelector('button#stop');
+
+function handleDataAvailable(event) {
+  console.log('Pushed Blob: ' + event.timecode);
+  if (event.data && event.data.size > 0) {
+    recordedBlobs.push(event.data);
+    // Push Data
+    // TODO mark uploaded records
+    axios.post(videoUrl, event.data, { headers: {
+      'X-Chunk-Order': recordedBlobs.length,
+    }})
+      .then(function (response) {
+        console.log(response);
+      })
+      .catch(function (error) {
+        // TODO Retry
+        console.log(error);
+        stopRecording();
+      });
+  }
+}
+
 function startRecording() {
   recordedBlobs = [];
   var options = {
 //    audioBitsPerSecond : 128000,
 //    videoBitsPerSecond : 2500000,
-    mimeType: mimeType,
+    mimeType: videoMimeType,
   };
-// Force codec ? for stream reading ?
+
   try {
     mediaRecorder = new MediaRecorder(mediaStream, options);
   } catch (e) {
@@ -71,6 +82,7 @@ function startRecording() {
   };
   mediaRecorder.ondataavailable = handleDataAvailable;
   // Chrome give us avg 1 Cluster every 12s
+  // Firefox make one Cluster per trigger
   mediaRecorder.start(2000);
   console.log('MediaRecorder started', mediaRecorder);
 }
@@ -101,36 +113,12 @@ function handleSuccess(stream) {
   startRecording();
 }
 
-function download() {
-    var blob = new Blob(recordedBlobs, {
-        type: mimeType
-    });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    document.body.appendChild(a);
-    a.style = 'display: none';
-    a.href = url;
-    a.download = 'test.webm';
-    a.click();
-    window.URL.revokeObjectURL(url);
-}
-  
-// Selectors
-const previewVideo = document.querySelector('video#preview');
-const recordButton = document.querySelector('button#record');
-const stopButton = document.querySelector('button#stop');
-const ddlButton = document.querySelector('button#download');
-
 // Event Listener
 recordButton.addEventListener('click', () => {
-  mimeType = getSupportedMimeType();
   navigator.mediaDevices.getUserMedia(constraints)
       .then(handleSuccess)
       .catch(e => console.error('navigator.getUserMedia error:', e));    
 });
 stopButton.addEventListener('click', () => {
     stopRecording();
-});
-ddlButton.addEventListener('click', () => {
-    download();
 });
