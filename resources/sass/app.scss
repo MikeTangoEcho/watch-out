@@ -12,3 +12,27 @@
   background-color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
+
+// Find betterway to randomize dimensions
+.stream {
+  position: relative;
+  width: 160px;
+  height: 120px;
+}
+
+.stream-title {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  color: white;
+  font-size: 9px;
+}
+
+.stream-mute {
+  position: absolute;
+  top: 105px;
+  left: 135px;
+  color: white;
+  font-size: 9px;
+  z-index:2;
+}

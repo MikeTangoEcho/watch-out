@@ -18,6 +18,7 @@ class CreateStreamChunksTable extends Migration
             $table->unsignedInteger('stream_id');
             $table->unsignedInteger('chunk_id'); // 0 = header
             $table->string('filename');
+            $table->unsignedInteger('filesize')->default(0);
             $table->unsignedInteger('cluster_offset')->nullable();
             $table->timestamps();
 

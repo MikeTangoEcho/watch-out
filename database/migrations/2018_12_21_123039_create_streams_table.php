@@ -17,6 +17,7 @@ class CreateStreamsTable extends Migration
             $table->increments('id');
             $table->string('title');
             $table->string('mime_type');
+            $table->unsignedInteger('total_size')->default(0);
             $table->timestamps();
 
             $table->unsignedInteger('user_id');

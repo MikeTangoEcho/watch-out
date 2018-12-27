@@ -129,7 +129,7 @@ class StreamController extends Controller
         // Start with EBML header => look for next cluter and split
         // Not start with Cluster => look for next cluster and split by timecode, begin will be appended to last file
         $fStream = fopen('php://temp', 'rwb');
-        fwrite($fStream, $request->getContent());
+        $chunkSize = fwrite($fStream, $request->getContent());
         rewind($fStream);
         $webm = new Webm();
         // Get Pos of first Cluster
@@ -145,7 +145,7 @@ class StreamController extends Controller
             $streamChunk->chunk_id = 0;
             $streamChunk->filename = StreamChunk::getFilename($stream->id, 0, false);
             $header = fopen('php://temp', 'wb');
-            stream_copy_to_stream($fStream, $header, is_null($clusterPos) ? -1 : intval($clusterPos), 0);
+            $streamChunk->filesize = stream_copy_to_stream($fStream, $header, is_null($clusterPos) ? -1 : intval($clusterPos), 0);
             Storage::put($streamChunk->filename, $header);
             fclose($header);
             $streamChunk->save();
@@ -163,7 +163,7 @@ class StreamController extends Controller
             $streamChunk->filename = StreamChunk::getFilename($stream->id, $chunkId, $clusterPos);
             $streamChunk->cluster_offset = $clusterPos;
             $fChunk = fopen('php://temp', 'wb');
-            stream_copy_to_stream($fStream, $fChunk);
+            $streamChunk->filesize = stream_copy_to_stream($fStream, $fChunk);
             Storage::put($streamChunk->filename, $fChunk);
             fclose($fChunk);
             $streamChunk->save();
@@ -171,6 +171,7 @@ class StreamController extends Controller
         }
         // Forge header to send next block id ?
         fclose($fStream);
+        $stream->increment('total_size', $chunkSize);
     }
 
     public function pull(Request $request, Stream $stream)
