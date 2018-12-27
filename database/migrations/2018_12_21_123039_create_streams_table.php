@@ -18,6 +18,9 @@ class CreateStreamsTable extends Migration
             $table->string('title');
             $table->string('mime_type');
             $table->timestamps();
+
+            $table->unsignedInteger('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
 
@@ -28,6 +31,9 @@ class CreateStreamsTable extends Migration
      */
     public function down()
     {
+        Schema::table('streams', function (Blueprint $table) {
+            $table->dropForeign(['user_id']);
+        });
         Schema::dropIfExists('streams');
     }
 }

@@ -113,13 +113,3 @@ class Streamer {
       .catch(this.closeStream.bind(this));
   }
 }
-
-// MAIN
-
-// TODO Delegate to openStream on each new elements
-var streamersElements = document.getElementsByClassName('streamer');
-var streamers = Array.prototype.map.call(streamersElements, function(e){
-  var s = new Streamer(e);
-  s.openStream();
-  return s;
-});

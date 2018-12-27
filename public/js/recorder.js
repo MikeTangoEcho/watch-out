@@ -128,17 +128,3 @@ class Recorder {
     console.log("Media Stream Closed");
   }
 }
-
-// MAIN
-
-// Selectors
-const previewVideo = document.querySelector('video#preview');
-const recordButton = document.querySelector('button#record');
-const stopButton = document.querySelector('button#stop');
-
-// Init Recorder
-var recorder = new Recorder(previewVideo);
-
-// Event Listener
-recordButton.addEventListener('click', recorder.openStream.bind(recorder));
-stopButton.addEventListener('click', recorder.stopRecording.bind(recorder));

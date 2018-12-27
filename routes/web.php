@@ -11,14 +11,22 @@
 |
 */
 
-Route::get('/record', 'StreamController@record')
-    ->name('stream.record');
+Auth::routes(['verify' => true]);
 
+Route::resource('users', 'UserController')
+    ->middleware('auth');
+Route::put('users/{user}/password', 'UserController@updatePassword')
+    ->middleware('auth')
+    ->name('users.update_password');
 
 Route::resource('streams', 'StreamController');
+Route::get('/record', 'StreamController@record')
+    ->middleware(['auth', 'verified'])
+    ->name('streams.record');
 Route::get('/stream/{stream}/full', 'StreamController@full')
-    ->name('stream.full');
+    ->name('streams.full');
 Route::get('/streams/{stream}/chunks', 'StreamController@pull')
-    ->name('stream.pull');
+    ->name('streams.pull');
 Route::post('/streams/{stream}/chunks', 'StreamController@push')
-    ->name('stream.push');
+    ->middleware(['auth', 'verified'])
+    ->name('streams.push');

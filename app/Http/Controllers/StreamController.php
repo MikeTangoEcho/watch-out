@@ -2,15 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Lib\Webm;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Stream;
 use App\StreamChunk;
+use App\Lib\Webm;
 
 class StreamController extends Controller
 {
+
+    public function __construct() {
+        $this->authorizeResource(Stream::class);
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -19,8 +25,9 @@ class StreamController extends Controller
     public function index()
     {
         $streams = Stream::orderBy('updated_at', 'desc')
-            ->limit(1)
-            ->get();
+            ->with('user:id,name')
+            ->streamingSince(60)
+            ->paginate();
         return view('streams', ['streams' => $streams]);
     }
 
@@ -92,9 +99,12 @@ class StreamController extends Controller
 
     public function record()
     {
+        $this->authorize('create', Stream::class);
+
         $stream = new Stream();
         $stream->title = "Do it Live!";
         $stream->mime_type = 'video/webm;codecs="opus,vp8"';
+        $stream->user_id = Auth::id();
         $stream->save();
 
         return view('record', ['stream' => $stream]);
@@ -102,6 +112,8 @@ class StreamController extends Controller
 
     public function push(Request $request, Stream $stream)
     {
+        $this->authorize('update', $stream);
+
         // Same RFC, different behaviors, how the fuck ?
         // Firefox:
         // - Split stream by cluster with fixed size on trigger
@@ -163,6 +175,8 @@ class StreamController extends Controller
 
     public function pull(Request $request, Stream $stream)
     {
+        $this->authorize('view', $stream);
+
         $filesToStream = [];
         $nextChunkId = -1;
         $seekCluster = false;
@@ -219,6 +233,7 @@ class StreamController extends Controller
     
     public function full(Request $request, Stream $stream)
     {
+        $this->authorize('view', $stream);
 
         // TODO Query all chunk filename
         $filesToStream = $stream->chunks()->orderBy('chunk_id')->pluck('filename');
