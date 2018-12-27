@@ -73,6 +73,7 @@ class Streamer {
     }
     URL.revokeObjectURL(this.playerVideo.src);
     console.log("Closed Stream", this.src);
+    // TODO Remove player
   }
 
   appendBuffer(response) {

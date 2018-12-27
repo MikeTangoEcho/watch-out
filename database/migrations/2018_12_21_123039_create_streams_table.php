@@ -14,13 +14,13 @@ class CreateStreamsTable extends Migration
     public function up()
     {
         Schema::create('streams', function (Blueprint $table) {
-            $table->increments('id');
+            $table->bigIncrements('id');
             $table->string('title');
             $table->string('mime_type');
             $table->unsignedInteger('total_size')->default(0);
             $table->timestamps();
 
-            $table->unsignedInteger('user_id');
+            $table->unsignedBigInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }

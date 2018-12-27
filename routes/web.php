@@ -30,3 +30,6 @@ Route::get('/streams/{stream}/chunks', 'StreamController@pull')
 Route::post('/streams/{stream}/chunks', 'StreamController@push')
     ->middleware(['auth', 'verified'])
     ->name('streams.push');
+Route::get('/history', 'StreamController@history')
+    ->middleware(['auth', 'verified'])
+    ->name('streams.history');

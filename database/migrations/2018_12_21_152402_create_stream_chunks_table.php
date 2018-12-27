@@ -14,8 +14,7 @@ class CreateStreamChunksTable extends Migration
     public function up()
     {
         Schema::create('stream_chunks', function (Blueprint $table) {
-            $table->increments('id');
-            $table->unsignedInteger('stream_id');
+            $table->unsignedBigInteger('stream_id');
             $table->unsignedInteger('chunk_id'); // 0 = header
             $table->string('filename');
             $table->unsignedInteger('filesize')->default(0);
@@ -23,6 +22,7 @@ class CreateStreamChunksTable extends Migration
             $table->timestamps();
 
             $table->foreign('stream_id')->references('id')->on('streams')->onDelete('cascade');
+            $table->primary(['stream_id', 'chunk_id']);
         });
     }
 

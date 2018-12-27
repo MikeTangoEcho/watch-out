@@ -16,8 +16,8 @@
             <div class="embed-responsive embed-responsive-16by9">
                 <video id="preview"
                     muted
-                    width="640"
-                    height="480"
+                    width="320"
+                    height="240"
                     autoplay
                     playsinline
                     data-src="{{ route('streams.push', ['stream' => $stream->id])}}"

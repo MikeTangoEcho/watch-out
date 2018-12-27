@@ -32,6 +32,21 @@ class StreamController extends Controller
     }
 
     /**
+     * Display a listing of the resource as history.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function history()
+    {
+        $streams = Auth::user()->streams()
+        // Select 1st chunk created_at
+        // Select last chunk created_at
+            ->with(['firstChunk', 'lastChunk'])
+            ->paginate();
+        return view('streams_history', ['streams' => $streams]);
+    }
+
+    /**
      * Show the form for creating a new resource.
      *
      * @return \Illuminate\Http\Response
@@ -145,7 +160,9 @@ class StreamController extends Controller
             $streamChunk->chunk_id = 0;
             $streamChunk->filename = StreamChunk::getFilename($stream->id, 0, false);
             $header = fopen('php://temp', 'wb');
-            $streamChunk->filesize = stream_copy_to_stream($fStream, $header, is_null($clusterPos) ? -1 : intval($clusterPos), 0);
+            $streamChunk->filesize = stream_copy_to_stream($fStream, $header,
+                is_null($clusterPos) ? -1 : intval($clusterPos),
+                0);
             Storage::put($streamChunk->filename, $header);
             fclose($header);
             $streamChunk->save();
