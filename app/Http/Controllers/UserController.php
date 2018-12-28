@@ -23,7 +23,11 @@ class UserController extends Controller
      */
     public function index()
     {
-        //
+        $users = User::whereNotNull('email_verified_at')
+            ->withCount(['streams'  => function($query) {
+                return $query->whereHas('firstChunk');
+            }]);
+        return view('users', ['users' => $users->paginate()]);
     }
 
     /**

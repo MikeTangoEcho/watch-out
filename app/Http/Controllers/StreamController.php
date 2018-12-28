@@ -27,6 +27,7 @@ class StreamController extends Controller
         $streams = Stream::orderBy('updated_at', 'desc')
             ->with('user:id,name')
             ->streamingSince(60)
+            ->limit(1) // FIX
             ->paginate();
         return view('streams', ['streams' => $streams]);
     }
@@ -137,6 +138,7 @@ class StreamController extends Controller
         // - Clusters with infinite size that hold ~11sec that are split on trigger
         // - SimpleBlock of all tracks share the same timecode counter
 
+        // TODO Stop stream if it reaches size limit
         // https://w3c.github.io/media-source/webm-byte-stream-format.html
         // https://axel.isouard.fr/blog/2016/05/24/streaming-webm-video-over-html5-with-media-source
         // TODO Check if stream is in progress
@@ -181,7 +183,11 @@ class StreamController extends Controller
             $streamChunk->cluster_offset = $clusterPos;
             $fChunk = fopen('php://temp', 'wb');
             $streamChunk->filesize = stream_copy_to_stream($fStream, $fChunk);
-            Storage::put($streamChunk->filename, $fChunk);
+            // Repair if firefox
+            rewind($fChunk);
+            $fRepaired = $webm->repairChunk($fChunk);
+            Storage::put($streamChunk->filename, $fRepaired);
+            fclose($fRepaired);
             fclose($fChunk);
             $streamChunk->save();
             Log::debug('Stream Chunk ' . $chunkId);

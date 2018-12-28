@@ -23,7 +23,7 @@ Route::resource('streams', 'StreamController');
 Route::get('/record', 'StreamController@record')
     ->middleware(['auth', 'verified'])
     ->name('streams.record');
-Route::get('/stream/{stream}/full', 'StreamController@full')
+Route::get('/streams/{stream}/full', 'StreamController@full')
     ->name('streams.full');
 Route::get('/streams/{stream}/chunks', 'StreamController@pull')
     ->name('streams.pull');

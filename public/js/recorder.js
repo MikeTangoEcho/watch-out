@@ -5,18 +5,24 @@ class Recorder {
   constructor(playerVideo) {
     this.userMediaConstraints = {
       audio: true,
+      // TODO audio only, but container is totally different
       video: { 
         width: { min: 640, ideal: 640 },
         height: { min: 480, ideal: 480 }
       }
     };
-// TODO Find somewhat good quality
+    // TODO Find acceptable quality
     this.mediaRecorderOptions = {
 //      audioBitsPerSecond : 128000,
 //      videoBitsPerSecond : 2500000,
     };
     this.playerVideo = playerVideo;
-    this.pushDelayMs = 2000;
+    // Reducing the delay of push:
+    // + reduce the latency
+    // + small payload, thus less memory bottleneck
+    // - increase cpu load (firefox chunk with bad timecode, redo in js ?)
+    // - increase HTTP client request over time
+    this.pushDelayMs = 2000; 
   }
 
   get src() {
@@ -54,12 +60,12 @@ class Recorder {
   }
 
   onDataAvailable(e) {
-    if (event.data && event.data.size > 0) {
+    if (e.data && e.data.size > 0) {
       var dataChunkOrder = this.chunkOrder;
       console.log('Pushed Blob', dataChunkOrder);
       this.chunkOrder++;
       // Push Data
-      axios.post(this.src, event.data,
+      axios.post(this.src, e.data,
         { headers: { 'X-Chunk-Order': dataChunkOrder }})
         .then(response => console.log(response))
         .catch(this.stopRecording.bind(this));

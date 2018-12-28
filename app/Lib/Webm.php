@@ -1,9 +1,15 @@
 <?php
 
 namespace App\Lib;
+use Illuminate\Support\Facades\Log;
 
 class Webm
 {
+    private function log($o) {
+        if ($this->debug)
+            var_dump($o);
+    }
+
     public $debug = False;
 
     // https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/common/webmids.h
@@ -248,7 +254,7 @@ class Webm
                         ],
                         'a3' => [
                             'name' => 'SimpleBlock',
-                            'format' => 'bin',
+                            'format' => 'simpleblock',
                             'mandatory' => false,
                             'multiple' => true
                         ],
@@ -302,6 +308,18 @@ class Webm
                 return substr($value, 0, 25);
             case 'bin':
                 return bin2hex(substr($value, 0, 25));
+            case 'simpleblock':
+                $tmp = fopen('php://temp', 'rwb');
+                fwrite($tmp, $value);
+                rewind($tmp);
+                $track_id = $this->getUIntLength($tmp);
+                $timecode = $this->UnserializeUInt(fread($tmp, 2));
+                fclose($tmp);
+                return [
+                    'track_id' => $track_id,
+                    'timecode' => $timecode,
+                    'value' => bin2hex(substr($value, 0, 25))
+                ];
         }
     }
 
@@ -310,11 +328,14 @@ class Webm
         $id = '';
         $size = 0;
         $checkBytes = 0x80;
-        while (($char = fread($stream, 1)) && $size < $this->kMaxIdLengthInBytes) {
-            $id .= $char;
+        while ($size < $this->kMaxIdLengthInBytes) {
+            $id .= fread($stream, 1);
             // The leading bits of the EBML IDs are used to identify the length of the ID.
             // The number of leading 0's + 1 is the length of the ID in octets.
             // We will refer to the leading bits as the Length Descriptor.
+            if (feof($stream)) {
+                break;
+            }
             if (($checkBytes >> $size) & ord($id[0])) {
                 break;
             }
@@ -332,8 +353,11 @@ class Webm
         $size = 0;
         $length = '';
         $checkBytes = 0x80;
-        while (($char = fread($stream, 1)) && $size < $this->kMkvEBMLMaxSizeLength) {
-            $length .= $char;
+        while ($size < $this->kMkvEBMLMaxSizeLength) {
+            $length .= fread($stream, 1);
+            if (feof($stream)) {
+                break;
+            }
             if (($checkBytes >> $size) & ord($length[0])) {
                 break;
             }
@@ -355,11 +379,6 @@ class Webm
         if (is_array($r))
             return $r[1];
         return $r;
-    }
-
-    private function log($o) {
-        if ($this->debug)
-            var_dump($o);
     }
 
     /**
@@ -404,7 +423,7 @@ class Webm
                         $value = $this->formatValue($elementStruct['format'], fread($stream, $valueLength));
                     }
                     $element['value'] = $value;
-                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] .  ":O:" . $tagStart . ":L:" . $valueLength . ":V:" . $element['value']);
+                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] .  ":O:" . $tagStart . ":L:" . $valueLength . ":V:" . var_export($element['value'], true));
                 }                
                 // TODO Check Multiple
                 if (isset($elementStruct['multiple'])) {
@@ -457,6 +476,79 @@ class Webm
     {
         $ebml = $this->parseElements($stream, $this->ebmlStruct, -1, $extractData, $extractNested);
         return $ebml;
+    }
+
+    public function parseClusters($stream)
+    {
+        $ebml = null;
+        // Hack for firefox
+        $clusterStruct = ['1f43b675' => $this->ebmlStruct['18538067']['struct']['1f43b675']];
+        // Seek first Cluster
+        $offset = $this->seekNextId($stream, '1f43b675');
+        if (!is_null($offset)) {
+            fseek($stream, $offset);
+            $ebml = $this->parseElements($stream, $clusterStruct, -1);
+        }
+        return $ebml;
+    }
+
+    /**
+     * Repair Cluster in a Stream
+     * Return the handle of the repaired cluster
+     */
+    public function repairChunk($stream, $checkOnly=false)
+    {
+        // Parse Clusters
+        $struct = $this->parseClusters($stream);
+        if (is_null($struct)) {
+            throw new \Exception("No clusters found");
+        }
+
+        if ($checkOnly) {
+            // Only asked to check
+            foreach($struct['Cluster'] as $cluster) {
+                $previousTimecode = 0;
+                $this->log('Cluster:' . $cluster['offset'] . '-' . ($cluster['valueOffset'] + $cluster['valueLength']) . ':timecode:' . $cluster['elements']['Timecode']['value']);
+                foreach($cluster['elements']['SimpleBlock'] as $block) {
+                    if ($previousTimecode > $block['value']['timecode']) {
+                        $this->log('SimpleBlock:' . $block['offset']
+                            . ':track:' . $block['value']['track_id']
+                            . ':timecode:' . $block['value']['timecode']
+                            . ' is wrong previous:' . $previousTimecode
+                        );
+                    }
+                    $previousTimecode = $block['value']['timecode'];
+                }
+            }
+        } else {
+            // Repair stream
+            $repair = fopen('php://temp', 'wb');
+            rewind($stream);
+            // Copy stream until first cluster
+            stream_copy_to_stream($stream, $repair, $struct['Cluster'][0]['offset']);
+            // Reorder Cluster ? No because of splitted chunk
+            foreach($struct['Cluster'] as $cluster) {
+                // Copy Cluster head with timecode
+                stream_copy_to_stream($stream, $repair,
+                    $cluster['elements']['SimpleBlock'][0]['offset'] - $cluster['offset'],
+                    $cluster['offset']
+                );
+                // Copy Everything after timecode and first simpleblock
+                // Select all simpleblocks and reorder with timecode
+                $sorted_blocks = array_sort($cluster['elements']['SimpleBlock'], function ($v) {
+                    return $v['value']['timecode'];
+                });
+                // Copy to stream by respecting order
+                foreach($sorted_blocks as $block) {
+                    stream_copy_to_stream($stream, $repair, 
+                        $block['valueLength'] + $block['valueOffset'] - $block['offset'],
+                        $block['offset']
+                    );
+                }
+                // Copy Everything after timecode and last simpleblock                
+            }
+            return $repair;
+        }
     }
 }
 

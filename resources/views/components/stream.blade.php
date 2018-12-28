@@ -1,5 +1,5 @@
 <div class="stream"
-    style="position: relative;width: 160px; height: 120px;">
+    style="position: relative;width: 160px; height: 120px;border: 1px solid red;">
     <span class="stream-title"
         style="position: absolute;top: 5px;left: 5px;color: white;font-size: 9px;">
         {{ $stream->user->name }} -- {{ $stream->title }}
