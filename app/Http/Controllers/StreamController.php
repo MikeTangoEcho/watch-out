@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Stream;
 use App\StreamChunk;
 use App\Lib\Webm;
+use App\Http\Requests\EditStream;
 
 class StreamController extends Controller
 {
@@ -18,7 +19,7 @@ class StreamController extends Controller
     }
 
     /**
-     * Display a listing of the resource.
+     * Display a listing of the last stream.
      *
      * @return \Illuminate\Http\Response
      */
@@ -33,7 +34,7 @@ class StreamController extends Controller
     }
 
     /**
-     * Display a listing of the resource as history.
+     * Display a user's stream history.
      *
      * @return \Illuminate\Http\Response
      */
@@ -48,28 +49,7 @@ class StreamController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
+     * Display a stream in single screen.
      *
      * @param  \App\Stream  $Stream
      * @return \Illuminate\Http\Response
@@ -80,26 +60,17 @@ class StreamController extends Controller
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Update the specified stream.
      *
-     * @param  \App\Stream  $stream
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Stream $stream)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Http\Requests\EditStream  $request
      * @param  \App\Stream  $Stream
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, Stream $stream)
+    public function update(EditStream $request, Stream $stream)
     {
-        //
+        $validated = $request->validated();
+        $stream->title = $validated['title'];
+        $stream->save();
     }
 
     /**
@@ -110,15 +81,22 @@ class StreamController extends Controller
      */
     public function destroy(Stream $stream)
     {
-        //
+        // TODO Auto-remove with TTL
     }
 
+    /**
+     * Create a new Stream and return a view to allow streaming chunks
+     * 
+     * @return \Illuminate\Http\Response
+     */
     public function record()
     {
         $this->authorize('create', Stream::class);
 
         $stream = new Stream();
         $stream->title = "Do it Live!";
+        // Most supported codec
+        // TODO allow user to choose codecs, but warns that some browser may not support it
         $stream->mime_type = 'video/webm;codecs="opus,vp8"';
         $stream->user_id = Auth::id();
         $stream->save();
@@ -126,52 +104,71 @@ class StreamController extends Controller
         return view('record', ['stream' => $stream]);
     }
 
+    /**
+     * Retreive chunk pushed by the streaming app
+     * Store it or repair it
+     *
+     * @param  \App\Stream  $Stream
+     * @return \Illuminate\Http\Response
+     */
     public function push(Request $request, Stream $stream)
     {
         $this->authorize('update', $stream);
 
-        // Same RFC, different behaviors, how the fuck ?
+        // Same RFC, different behaviors, and dont want to rework chunk on js
+        // https://w3c.github.io/media-source/webm-byte-stream-format.html
         // Firefox:
         // - Split stream by cluster with fixed size on trigger
-        // - SimpleBlock have differents timecode counter for each tracks | need to fix it
+        // - SimpleBlocks timecode counter differs on each tracks (sound and video)
         // Chrome:
         // - Clusters with infinite size that hold ~11sec that are split on trigger
         // - SimpleBlock of all tracks share the same timecode counter
+        // - On push first Chunk holds the EBML header and the first Cluster
+        // - On pull if you send the same first chunk and use it on appendBuffer it crashes,
+        //   the first chunk must always be the EBMLHeader only
 
         // TODO Stop stream if it reaches size limit
-        // https://w3c.github.io/media-source/webm-byte-stream-format.html
-        // https://axel.isouard.fr/blog/2016/05/24/streaming-webm-video-over-html5-with-media-source
         // TODO Check if stream is in progress
 
         // Start with EBML header => look for next cluter and split
         // Not start with Cluster => look for next cluster and split by timecode, begin will be appended to last file
-        $fStream = fopen('php://temp', 'rwb');
+        // Create an handle to manage the payload
+        $fStream = fopen('php://temp', 'wb');
         $chunkSize = fwrite($fStream, $request->getContent());
         rewind($fStream);
         $webm = new Webm();
-        // Get Pos of first Cluster
-        $clusterPos = $webm->seekNextId($fStream, '1f43b675');
+        // Get pos of first Cluster
+        // Needed for Chrome, allow me flags and seeks the closest one.
+        $clusterOffset = $webm->seekNextId($fStream, '1f43b675');
         rewind($fStream);
         $chunkId = $request->header('X-Chunk-Order');
-        // Check if Init
-        // TODO Insert if not exists or prevent insertion of Chunk in wrong order
+        // TODO Consistency check if possible ?
+        // Chunk are ordered by client but http request may not arrive at the same time
         // Check if first bytes is the EMBL Header
         if ($chunkId == 1) {
+            // Fist chunk must contains the EBMLHeader
+            // TODO Parse the whole if it doesnt affects spec
+            $tag = bin2hex(fread($fStream, 5));
+            rewind($fStream);
+            if ($tag == '1a45dfa3') {
+                Log::error('stream[' . $stream->id .'] first chunk has no EBMLHeader tag');
+                abort('400', 'Invalid Chunk, first chunk must hold the EBMLHeader');
+            }
             $streamChunk = new StreamChunk();
             $streamChunk->stream_id = $stream->id;
             $streamChunk->chunk_id = 0;
             $streamChunk->filename = StreamChunk::getFilename($stream->id, 0, false);
-            $header = fopen('php://temp', 'wb');
-            $streamChunk->filesize = stream_copy_to_stream($fStream, $header,
-                is_null($clusterPos) ? -1 : intval($clusterPos),
+            $fHeader = fopen('php://temp', 'wb');
+            $streamChunk->filesize = stream_copy_to_stream($fStream, $fHeader,
+                is_null($clusterOffset) ? -1 : intval($clusterOffset),
                 0);
-            Storage::put($streamChunk->filename, $header);
-            fclose($header);
+            Storage::put($streamChunk->filename, $fHeader);
+            fclose($fHeader);
             $streamChunk->save();
-            Log::debug('Stream Header');
-            // Still has cluster
-            if (!is_null($clusterPos)) {
-               $clusterPos = 0;
+            Log::debug('stream[' . $stream->id .'] push header');
+            // Still has cluster, set offset to 0 for next code section
+            if (!is_null($clusterOffset)) {
+               $clusterOffset = 0;
             }
         }
         // If not eof write chunk and flag if cluster
@@ -179,24 +176,37 @@ class StreamController extends Controller
             $streamChunk = new StreamChunk();
             $streamChunk->stream_id = $stream->id;
             $streamChunk->chunk_id = $chunkId;
-            $streamChunk->filename = StreamChunk::getFilename($stream->id, $chunkId, $clusterPos);
-            $streamChunk->cluster_offset = $clusterPos;
+            $streamChunk->filename = StreamChunk::getFilename($stream->id, $chunkId, $clusterOffset);
+            $streamChunk->cluster_offset = $clusterOffset;
             $fChunk = fopen('php://temp', 'wb');
             $streamChunk->filesize = stream_copy_to_stream($fStream, $fChunk);
-            // Repair if firefox
+            // Repair Chunk if wrong timecode
             rewind($fChunk);
-            $fRepaired = $webm->repairChunk($fChunk);
-            Storage::put($streamChunk->filename, $fRepaired);
-            fclose($fRepaired);
+            if ($webm->needRepairCluster($fChunk, true)) {
+                rewind($fChunk);
+                $fRepaired = $webm->repairCluster($fChunk);
+                Log::debug('stream[' . $stream->id .'] repair chunk ' . $chunkId);
+                Storage::put($streamChunk->filename, $fRepaired);
+                fclose($fRepaired);
+            } else {
+                Storage::put($streamChunk->filename, $fChunk);
+            }
             fclose($fChunk);
             $streamChunk->save();
-            Log::debug('Stream Chunk ' . $chunkId);
+            Log::debug('stream[' . $stream->id .'] push chunk ' . $chunkId);
         }
-        // Forge header to send next block id ?
         fclose($fStream);
+        // Increments total_size
         $stream->increment('total_size', $chunkSize);
     }
 
+    /**
+     * Return asked chunk base on X-Chunk-Order header
+     * if asked chunk is -1 return latest cluster
+     * 
+     * @param  \App\Stream  $Stream
+     * @return \Illuminate\Http\Response
+     */
     public function pull(Request $request, Stream $stream)
     {
         $this->authorize('view', $stream);
@@ -209,6 +219,7 @@ class StreamController extends Controller
 
         $streamChunk = StreamChunk::where('stream_id', $stream->id);
         if ($chunkId == -1) {
+            // Seek latest cluster
             $streamChunk = $streamChunk
                 ->whereNotNull('cluster_offset')
                 ->orderBy('chunk_id', 'desc');
@@ -220,28 +231,33 @@ class StreamController extends Controller
         $streamChunk = $streamChunk->first();
         if ($streamChunk) {
             if ($chunkId == -1) {
+                // Set latest Chunk as the retrieved one
                 $chunkId = $streamChunk->chunk_id;
                 $seekCluster = true;
             }
-            if ($chunkId != 0) {
+            // Inc
+            if ($chunkId > 0) {
                $nextChunkId = $chunkId + 1;
             }
         }
         
         return response()->stream(function() use ($streamChunk, $seekCluster) {
-            // https://chromium.googlesource.com/webm/libvpx/+/master/webmdec.h
             // https://www.w3.org/TR/media-source/#init-segment
-            // TODO: query DB to b check if need to switch file
             if ($streamChunk && Storage::exists($streamChunk->filename)) {
                 $stream = Storage::readStream($streamChunk->filename);
                 if ($seekCluster && $streamChunk->cluster_offset) {
                     fseek($stream, $streamChunk->cluster_offset);
-                    Log::debug('Seek Cluster at ' . $streamChunk->cluster_offset);
+                    Log::debug('stream [' . $streamChunk->stream_id 
+                        . '] chunk [' . $streamChunk->chunk_id 
+                        . '] seek cluster at ' . $streamChunk->cluster_offset);
                 }
                 fpassthru($stream);
                 fclose($stream);
-                Log::debug('Sent ' . $streamChunk->filename);
+                Log::debug('stream [' . $streamChunk->stream_id 
+                    . '] chunk [' . $streamChunk->chunk_id 
+                    . '] file sent: ' . $streamChunk->filename);
             } else {
+                // No Content
                 abort(204);
             }
         }, 200, [
@@ -254,21 +270,26 @@ class StreamController extends Controller
         ]);
     }
 
-    
-    public function full(Request $request, Stream $stream)
+    /**
+     * Send all the Chunks !
+     * 
+     * @param  \App\Stream  $Stream
+     * @return \Illuminate\Http\Response
+     */
+    public function full(Stream $stream)
     {
         $this->authorize('view', $stream);
 
-        // TODO Query all chunk filename
+        // Get all chunk filename
         $filesToStream = $stream->chunks()->orderBy('chunk_id')->pluck('filename');
-        return response()->stream(function() use ($filesToStream) {
-            // Forge file
+        return response()->stream(function() use ($stream, $filesToStream) {
             foreach ($filesToStream as $file) {
                 if (Storage::exists($file)) {
-                    Log::debug('Full sent ' . $file);
                     $stream = Storage::readStream($file);
                     fpassthru($stream);
                     fclose($stream);
+                    Log::debug('stream [' . $stream->id 
+                        . '] file sent: ' . $file);
                 }
             }
         }, 200, [

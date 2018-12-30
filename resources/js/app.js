@@ -20,7 +20,9 @@ window.Vue = require('vue');
 // const files = require.context('./', true, /\.vue$/i)
 // files.keys().map(key => Vue.component(key.split('/').pop().split('.')[0], files(key)))
 
-Vue.component('example-component', require('./components/ExampleComponent.vue'));
+// TODO vanilla js to vue js
+//Vue.component('recorder-component', require('./components/RecorderComponent.vue'));
+//Vue.component('streamer-component', require('./components/StreamerComponent.vue'));
 
 /**
  * Next, we will create a fresh Vue application instance and attach it to

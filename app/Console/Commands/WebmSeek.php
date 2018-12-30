@@ -42,13 +42,11 @@ class WebmSeek extends Command
     {
         $stream = Storage::readStream($this->argument('file'));
         $webm = new Webm();
-        //$webm->debug = True;
+        //$webm->verbose = True;
         $offset = 0;
         $splitId = 1;
         $this->info('Read Webm');
         while ($pos = $webm->seekNextId($stream, $this->argument('hextag'))) {
-            var_dump($pos);
-            var_dump(dechex($pos));
             if ($this->option('split')) {
                 $tmp = fopen("php://temp", "wb");
                 fseek($stream, 0);

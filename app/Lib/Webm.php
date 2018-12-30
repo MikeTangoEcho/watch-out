@@ -3,17 +3,30 @@
 namespace App\Lib;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Toolbox to manage webm container based on matroska
+ * Helpers:
+ * - Chromium source code: https://chromium.googlesource.com/webm/
+ * - Matroska specs: https://matroska.org/technical/specs/index.html
+ */
 class Webm
 {
+    /**
+     * Base log for debug
+     */
     private function log($o) {
-        if ($this->debug)
+        if ($this->verbose)
             var_dump($o);
     }
 
-    public $debug = False;
+    public $verbose = False;
 
     // https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/common/webmids.h
-
+    // https://chromium.googlesource.com/webm/libvpx/+/master/webmdec.h
+    /**
+     * Array struct of an EBML container, used to parse an ebml file.
+     * Only mandatory and used struct for webm byte stream are defined
+     */
     public $ebmlStruct = [
         '1a45dfa3' => [
             'name' => 'EBMLHeader',
@@ -298,6 +311,9 @@ class Webm
     private $kMaxIdLengthInBytes = 4;
     private $kMkvEBMLMaxSizeLength = 8;
 
+    /**
+     * Return value in the format described by the spec
+     */
     private function formatValue($format, $value) {
         switch ($format) {
             case 'int':
@@ -323,8 +339,11 @@ class Webm
         }
     }
 
+    /**
+     * Read an EBML Id from a stream.
+     * MaxIdLength should be extracted from EBML header, but here its forced.
+     */
     private function readId($stream) {
-        // https://matroska.org/technical/specs/index.html
         $id = '';
         $size = 0;
         $checkBytes = 0x80;
@@ -336,7 +355,13 @@ class Webm
             if (feof($stream)) {
                 break;
             }
+            // 1000 0000 >> 2 => 0010 0000 (right shift)
+            // 0010 0000 & 0001 1111 => 0000 0000 (false)
+            // 0010 0000 & 0011 1111 => 0010 0000 (true)
             if (($checkBytes >> $size) & ord($id[0])) {
+                // Break once we found the leading bits.
+                // Number of loops is equal to the number of time we shift to the right,
+                // and the size of the id
                 break;
             }
             $size++;
@@ -346,10 +371,12 @@ class Webm
     }
 
     /**
+     * Retreive the unsigned integer length based
+     * 
      * https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/mkvparser/mkvparser.cc#172
      */
     private function getUIntLength($stream) {
-        // First bit will tell size
+        // Same thing that the Id but max length is different
         $size = 0;
         $length = '';
         $checkBytes = 0x80;
@@ -366,13 +393,19 @@ class Webm
         if  (!$length) {
             return 0;
         }
+        // Remove leading bits
         $length[0] = chr(ord($length[0]) ^ ($checkBytes >> $size));
 
-        if (bin2hex($length) == "00ffffffffffffff") // Unkown size for streaming
+        // Unkown size for streaming
+        if (bin2hex($length) == "00ffffffffffffff")
             return -1;
+
         return hexdec(bin2hex($length));
     }
 
+    /**
+     * Convert binary string holding an unsigned integer big endians to integer
+     */
     private function UnserializeUInt($bin) {
         $bin = str_pad($bin, 4, chr(0), STR_PAD_LEFT);
         $r = unpack('N', $bin);
@@ -384,10 +417,12 @@ class Webm
     /**
      * Extract the header from the first tracks to allow replay at anytime
      */
-    public function parseElements($stream, $struct, $structMaxOffset=-1, $extractData=false, $extractNested=false)
+    public function parseElements($stream, $struct, $structMaxOffset=-1,
+        $extractData=false, $extractNested=false)
     {
         $elements = [];
-        while (!feof($stream) && (ftell($stream) < $structMaxOffset  || $structMaxOffset == -1)) {
+        while (!feof($stream)
+            && (ftell($stream) < $structMaxOffset  || $structMaxOffset == -1)) {
             // Read Id
             $tagStart = ftell($stream);
             $id = $this->readId($stream);
@@ -407,7 +442,8 @@ class Webm
                 $elementStruct = $struct[bin2hex($id)];
                 $this->log('Found Id [' . bin2hex($id) . '] ' . $elementStruct['name']);
                 if ($elementStruct['format'] == 'master') {
-                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] .  ":O:" . $tagStart . ":L:" . $valueLength);
+                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] 
+                        . ":O:" . $tagStart . ":L:" . $valueLength);
                     // Recursiv
                     $element['elements'] = $this->parseElements($stream, $elementStruct['struct'],
                         $valueLength != -1 ? $valueStart + $valueLength : -1,
@@ -420,10 +456,13 @@ class Webm
                     } else if ($valueLength == 0) {
                         $value = null;
                     } else {
-                        $value = $this->formatValue($elementStruct['format'], fread($stream, $valueLength));
+                        $value = $this->formatValue($elementStruct['format'],
+                            fread($stream, $valueLength));
                     }
                     $element['value'] = $value;
-                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] .  ":O:" . $tagStart . ":L:" . $valueLength . ":V:" . var_export($element['value'], true));
+                    $this->log(bin2hex($id) . ":N:" . $elementStruct['name'] 
+                        . ":O:" . $tagStart . ":L:" . $valueLength . ":V:"
+                        . var_export($element['value'], true));
                 }                
                 // TODO Check Multiple
                 if (isset($elementStruct['multiple'])) {
@@ -444,7 +483,7 @@ class Webm
     }
 
     /**
-     * Return pos of Next cluster
+     * Seek the offset of the next Tag represented as an hex string in the stream
      */
     public function seekNextId($stream, $hexTagId)
     {
@@ -466,6 +505,7 @@ class Webm
         if ($successChain == $tagSize) {
             return ftell($stream) - $tagSize; // Offset
         }
+
         return null;
     }
 
@@ -478,10 +518,12 @@ class Webm
         return $ebml;
     }
 
+    /**
+     * Parse the next Cluster in the stream
+     */
     public function parseClusters($stream)
     {
         $ebml = null;
-        // Hack for firefox
         $clusterStruct = ['1f43b675' => $this->ebmlStruct['18538067']['struct']['1f43b675']];
         // Seek first Cluster
         $offset = $this->seekNextId($stream, '1f43b675');
@@ -489,14 +531,57 @@ class Webm
             fseek($stream, $offset);
             $ebml = $this->parseElements($stream, $clusterStruct, -1);
         }
+
         return $ebml;
     }
 
     /**
-     * Repair Cluster in a Stream
-     * Return the handle of the repaired cluster
+     * Check if need Repair Cluster in a Stream
+     * Return the handle of the repaired cluster or 
      */
-    public function repairChunk($stream, $checkOnly=false)
+    public function needRepairCluster($stream, $breakOnFirst=false)
+    {
+        // Parse Clusters
+        $struct = $this->parseClusters($stream);
+        if (is_null($struct)) {
+            return false;
+        }
+
+        // Only asked to check
+        $needRepair = false;
+        foreach($struct['Cluster'] as $cluster) {
+            if ($cluster['valueLength'] == -1) {
+                // Infinite length Cluster are made by Chrome and may contains splitted Chunk
+                // So avoid repair
+                return false;
+            }
+            $previousTimecode = 0;
+            $this->log('Cluster:' . $cluster['offset'] 
+                . '-' . ($cluster['valueOffset'] + $cluster['valueLength'])
+                . ':timecode:' . $cluster['elements']['Timecode']['value']);
+            foreach($cluster['elements']['SimpleBlock'] as $block) {
+                if ($previousTimecode > $block['value']['timecode']) {
+                    $needRepair = true;
+                    $this->log('SimpleBlock:' . $block['offset']
+                        . ':track:' . $block['value']['track_id']
+                        . ':timecode:' . $block['value']['timecode']
+                        . ' is wrong previous:' . $previousTimecode
+                    );
+                    if ($breakOnFirst) {
+                        return true; 
+                    }
+                }
+                $previousTimecode = $block['value']['timecode'];
+            }
+        }
+
+        return $needRepair;
+    }
+
+    /**
+     * Repair the cluster by re-ordering the timecodes
+     */
+    public function repairCluster($stream)
     {
         // Parse Clusters
         $struct = $this->parseClusters($stream);
@@ -504,51 +589,33 @@ class Webm
             throw new \Exception("No clusters found");
         }
 
-        if ($checkOnly) {
-            // Only asked to check
-            foreach($struct['Cluster'] as $cluster) {
-                $previousTimecode = 0;
-                $this->log('Cluster:' . $cluster['offset'] . '-' . ($cluster['valueOffset'] + $cluster['valueLength']) . ':timecode:' . $cluster['elements']['Timecode']['value']);
-                foreach($cluster['elements']['SimpleBlock'] as $block) {
-                    if ($previousTimecode > $block['value']['timecode']) {
-                        $this->log('SimpleBlock:' . $block['offset']
-                            . ':track:' . $block['value']['track_id']
-                            . ':timecode:' . $block['value']['timecode']
-                            . ' is wrong previous:' . $previousTimecode
-                        );
-                    }
-                    $previousTimecode = $block['value']['timecode'];
-                }
-            }
-        } else {
-            // Repair stream
-            $repair = fopen('php://temp', 'wb');
-            rewind($stream);
-            // Copy stream until first cluster
-            stream_copy_to_stream($stream, $repair, $struct['Cluster'][0]['offset']);
-            // Reorder Cluster ? No because of splitted chunk
-            foreach($struct['Cluster'] as $cluster) {
-                // Copy Cluster head with timecode
-                stream_copy_to_stream($stream, $repair,
-                    $cluster['elements']['SimpleBlock'][0]['offset'] - $cluster['offset'],
-                    $cluster['offset']
+        // Repair stream
+        $repair = fopen('php://temp', 'wb');
+        rewind($stream);
+        // Copy stream until first cluster
+        stream_copy_to_stream($stream, $repair, $struct['Cluster'][0]['offset']);
+        // Reorder Cluster ? No because of splitted chunk
+        foreach($struct['Cluster'] as $cluster) {
+            // Copy Cluster head with timecode
+            stream_copy_to_stream($stream, $repair,
+                $cluster['elements']['SimpleBlock'][0]['offset'] - $cluster['offset'],
+                $cluster['offset']
+            );
+            // Copy Everything after timecode and first simpleblock
+            // Select all simpleblocks and reorder with timecode
+            $sorted_blocks = array_sort($cluster['elements']['SimpleBlock'], function ($v) {
+                return $v['value']['timecode'];
+            });
+            // Copy to stream by respecting order
+            foreach($sorted_blocks as $block) {
+                stream_copy_to_stream($stream, $repair, 
+                    $block['valueLength'] + $block['valueOffset'] - $block['offset'],
+                    $block['offset']
                 );
-                // Copy Everything after timecode and first simpleblock
-                // Select all simpleblocks and reorder with timecode
-                $sorted_blocks = array_sort($cluster['elements']['SimpleBlock'], function ($v) {
-                    return $v['value']['timecode'];
-                });
-                // Copy to stream by respecting order
-                foreach($sorted_blocks as $block) {
-                    stream_copy_to_stream($stream, $repair, 
-                        $block['valueLength'] + $block['valueOffset'] - $block['offset'],
-                        $block['offset']
-                    );
-                }
-                // Copy Everything after timecode and last simpleblock                
             }
-            return $repair;
+            // Copy Everything after timecode and last simpleblock                
         }
+        return $repair;
     }
 }
 

@@ -42,7 +42,7 @@ class WebmParse extends Command
     {
         $stream = Storage::readStream($this->argument('file'));
         $webm = new Webm();
-        $webm->debug = True;
+        $webm->verbose = True;
         $this->info('Read Webm');
         $ebml = $webm->parse($stream);
         fclose($stream);

@@ -20,7 +20,7 @@ class WebmClusterRepair extends Command
      *
      * @var string
      */
-    protected $description = 'Parse cluster and repair timecodes';
+    protected $description = 'Parse cluster, check timecodes consistency and can repair them';
 
     /**
      * Create a new command instance.
@@ -41,13 +41,17 @@ class WebmClusterRepair extends Command
     {
         $stream = Storage::readStream($this->argument('file'));
         $webm = new Webm();
-        $webm->debug = true;
+        $webm->verbose = true;
 
         rewind($stream);
         if ($this->option('check')) {
-            $webm->repairChunk($stream, true);
+            if ($webm->needRepairCluster($stream)) {
+                $this->info('Cluster need to be repaired');
+            } else {
+                $this->info('Cluster is ok!');
+            }
         } else {            
-            $repair = $webm->repairChunk($stream);
+            $repair = $webm->repairCluster($stream);
             Storage::put($this->argument('file') . '-forged', $repair);
             fclose($repair);
         }

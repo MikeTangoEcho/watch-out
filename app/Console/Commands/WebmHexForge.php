@@ -21,7 +21,7 @@ class WebmHexForge extends Command
      *
      * @var string
      */
-    protected $description = 'Extract init segment from webm byte stream';
+    protected $description = 'Forge a string in hex format in the file';
 
     /**
      * Create a new command instance.

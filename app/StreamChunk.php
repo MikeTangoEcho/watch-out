@@ -3,6 +3,7 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class StreamChunk extends Model
 {
@@ -19,5 +20,12 @@ class StreamChunk extends Model
                 ( is_null($clusterOffset) ? "-chunk" : "-cluster-" . intval($clusterOffset) )
                 )
             . ".webm";
+    }
+
+    public function deleteFile()
+    {
+        if (Storage::exists($this->filename)) {
+            Storage::delete($this->filename);
+        }
     }
 }
