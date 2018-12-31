@@ -6,16 +6,16 @@
         <table class="table table-sm">
             <thead>
                 <tr>
-                    <td></td>
-                    <td>{{ __('Name') }}</td>
-                    <td>{{ __('Joined At') }}</td>
-                    <td>{{ __('Streams') }}</td>
+                    <th scope="col"></th>
+                    <th scope="col">{{ __('Name') }}</th>
+                    <th scope="col">{{ __('Joined At') }}</th>
+                    <th scope="col">{{ __('Streams') }}</th>
                 <tr>
             </thead>
             <tbody>
                 @foreach($users as $user)
                 <tr>
-                    <td>{{ $user->id }}</td>
+                    <th scope="row">{{ $user->id }}</th>
                     <td>{{ $user->name }}</td>
                     <td>{{ $user->created_at }}</td>
                     <td>{{ $user->streams_count }}</td>

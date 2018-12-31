@@ -11,15 +11,14 @@
 .navbar-laravel {
   background-color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-}
+};
 
-// Find betterway to randomize dimensions
+// Find better way to randomize dimensions
 .stream {
   position: relative;
   width: 160px;
   height: 120px;
-  border: 1px solid red;
-}
+};
 
 .stream-title {
   position: absolute;
@@ -27,13 +26,51 @@
   left: 5px;
   color: white;
   font-size: 9px;
+  width: 150px;
+};
+
+.scroll-container {
+  overflow: hidden;
 }
+
+// Based on https://codepen.io/Murtaxa/pen/egrRbN
+.scroll-left {
+  /* Starting position */
+  -moz-transform:translateX(100%);
+  -webkit-transform:translateX(100%); 
+  transform:translateX(100%);
+  /* Apply animation to this element */ 
+  -moz-animation: scroll-left 10s linear infinite;
+  -webkit-animation: scroll-left 10s linear infinite;
+  animation: scroll-left 10s linear infinite;
+};
+/* Move it (define the animation) */
+@-moz-keyframes scroll-left {
+  0% { -moz-transform: translateX(100%); }
+  100% { -moz-transform: translateX(-100%); }
+};
+@-webkit-keyframes scroll-left {
+  0% { -webkit-transform: translateX(100%); }
+  100% { -webkit-transform: translateX(-100%); }
+};
+@keyframes scroll-left {
+  0% { 
+    -moz-transform: translateX(100%); /* Browser bug fix */
+    -webkit-transform: translateX(100%); /* Browser bug fix */
+    transform: translateX(100%); 
+  }
+  100% { 
+    -moz-transform: translateX(-100%); /* Browser bug fix */
+    -webkit-transform: translateX(-100%); /* Browser bug fix */
+    transform: translateX(-100%); 
+  }
+};
 
 .stream-mute {
   position: absolute;
-  top: 105px;
-  left: 135px;
+  top: 100px;
+  left: 140px;
   color: white;
-  font-size: 9px;
-  z-index:2;
-}
+  font-size: 18px; 
+  z-index:  2;
+};

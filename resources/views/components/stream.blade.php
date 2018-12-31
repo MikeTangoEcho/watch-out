@@ -1,14 +1,12 @@
-<div class="stream"
-    style="position: relative;width: 160px; height: 120px;border: 1px solid red;">
-    <span class="stream-title"
-        style="position: absolute;top: 5px;left: 5px;color: white;font-size: 9px;">
-        {{ $stream->user->name }} -- {{ $stream->title }}
+<div class="stream">
+    <span class="stream-title scroll-container">
+        <p class="scroll-left">{{ $stream->user->name }} -- {{ $stream->title }}</p>
     </span>
-    <span class="stream-mute"
-        style="position: absolute;top: 105px;left: 135px;color: white;font-size: 9px;z-index:2">
-        Mute
-    </span>
+    
+        <i class="stream-mute material-icons">volume_off</i>
+    
     <video
+        poster="{{ asset('images/mire160x120.png') }}"
         class="streamer"
         muted
         width="160"

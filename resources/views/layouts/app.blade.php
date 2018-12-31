@@ -7,7 +7,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <!-- Fonts -->
         <!-- <link href="https://fonts.googleapis.com/css?family=Nunito:200,600" rel="stylesheet" type="text/css"> -->
-
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
         <!-- Styles -->
         <link rel="stylesheet" type="text/css" href="{{ asset('css/app.css') }}">
     </head>
@@ -30,6 +30,9 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('streams.record') }}">{{ __('Record') }}</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ route('users.index') }}">{{ __('Streamers') }}</a>
                             </li>
                             @yield('navigation')
                         </ul>

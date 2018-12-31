@@ -20,16 +20,20 @@ Route::put('users/{user}/password', 'UserController@updatePassword')
     ->name('users.update_password');
 
 Route::resource('streams', 'StreamController');
-Route::get('/record', 'StreamController@record')
-    ->middleware(['auth', 'verified'])
-    ->name('streams.record');
-Route::get('/streams/{stream}/full', 'StreamController@full')
-    ->name('streams.full');
 Route::get('/streams/{stream}/chunks', 'StreamController@pull')
     ->name('streams.pull');
+Route::get('/streams/{stream}/full', 'StreamController@full')
+    ->name('streams.full')
+    ->middleware(['auth', 'verified']);
 Route::post('/streams/{stream}/chunks', 'StreamController@push')
     ->middleware(['auth', 'verified'])
     ->name('streams.push');
+
+Route::get('/record', 'StreamController@record')
+    ->middleware(['auth', 'verified'])
+    ->name('streams.record');
+
 Route::get('/history', 'StreamController@history')
     ->middleware(['auth', 'verified'])
     ->name('streams.history');
+

@@ -44,7 +44,9 @@ class StreamController extends Controller
         // Select 1st chunk created_at
         // Select last chunk created_at
             ->with(['firstChunk', 'lastChunk'])
+            ->orderBy('id', 'desc')
             ->paginate();
+
         return view('streams_history', ['streams' => $streams]);
     }
 
@@ -278,16 +280,16 @@ class StreamController extends Controller
      */
     public function full(Stream $stream)
     {
-        $this->authorize('view', $stream);
+        $this->authorize('update', $stream);
 
         // Get all chunk filename
         $filesToStream = $stream->chunks()->orderBy('chunk_id')->pluck('filename');
         return response()->stream(function() use ($stream, $filesToStream) {
             foreach ($filesToStream as $file) {
                 if (Storage::exists($file)) {
-                    $stream = Storage::readStream($file);
-                    fpassthru($stream);
-                    fclose($stream);
+                    $fStream = Storage::readStream($file);
+                    fpassthru($fStream);
+                    fclose($fStream);
                     Log::debug('stream [' . $stream->id 
                         . '] file sent: ' . $file);
                 }

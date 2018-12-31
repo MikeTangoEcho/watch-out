@@ -6,23 +6,29 @@
         <table class="table table-sm">
             <thead>
                 <tr>
-                    <td></td>
-                    <td>{{ __('Title') }}</td>
-                    <td>{{ __('Started At') }}</td>
-                    <td>{{ __('Last Updated At') }}</td>
-                    <td>{{ __('Size (Bytes)') }}</td>
-                    <td>{{ __('MimeType') }}</td>
+                    <th scope="col"></th>
+                    <th scope="col">{{ __('Title') }}</th>
+                    <th scope="col">{{ __('Started At') }}</th>
+                    <th scope="col">{{ __('Last Updated At') }}</th>
+                    <th scope="col">{{ __('Size (Bytes)') }}</th>
+                    <th scope="col">{{ __('MimeType') }}</th>
+                    <th scope="col">{{ __('Watch') }}</th>
                 <tr>
             </thead>
             <tbody>
                 @foreach($streams as $stream)
                 <tr>
-                    <td>{{ $stream->id }}</td>
+                    <th scope="row">{{ $stream->id }}</th>
                     <td>{{ $stream->title }}</td>
                     <td>{{ $stream->firstChunk['created_at'] }}</td>
                     <td>{{ $stream->lastChunk['created_at'] }}</td>
                     <td>{{ $stream->total_size }}</td>
                     <td>{{ $stream->mime_type }}</td>
+                    <td>
+                        <a href="{{ route('streams.full', ['stream' => $stream->id]) }}">
+                            <i class="material-icons">play_circle_outline</i>
+                        </a>
+                    </td>
                 <tr>
                 @endforeach
             </tbody>

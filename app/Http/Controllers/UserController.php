@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 use App\User;
 use App\Http\Requests\EditUser;
@@ -85,6 +86,7 @@ class UserController extends Controller
         $userValidated = $request->validated();
         $user->name = $userValidated['name'];
         $user->save();
+        Log::info('User [' . $user->id . '] updated');
 
         return redirect()
             ->route('users.edit', ['user' => $user->id])
@@ -115,7 +117,8 @@ class UserController extends Controller
         ]);
         $user->password = Hash::make($userValidated['new_password']);
         $user->save();
-        
+        Log::info('User [' . $user->id . '] updated password');
+
         return redirect()->route('users.edit', ['user' => $user->id])
             ->with('success_message', __('Password updated!'));
     }

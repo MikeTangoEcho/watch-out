@@ -27,7 +27,13 @@
         var mute = vid.parentNode.getElementsByClassName('stream-mute')[0];
         mute.addEventListener('click', function(e) {
             vid.muted = !vid.muted;
-            console.debug('Player muted', vid.muted);
+            if (vid.muted) {
+                this.innerHTML = "volume_off";
+                console.log("Muted", s.src);
+            } else {
+                this.innerHTML = "volume_up";
+                console.log("Unmuted", s.src);
+            }
         })
         s.openStream();
         return s;

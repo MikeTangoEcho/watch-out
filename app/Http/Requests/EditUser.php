@@ -24,8 +24,7 @@ class EditUser extends FormRequest
     public function rules()
     {
         return [
-            'name' => 'required|string|max:35',
-            'locale' => 'required|string|in:fr,en'
+            'name' => 'required|string|max:35'
         ];
     }
 }

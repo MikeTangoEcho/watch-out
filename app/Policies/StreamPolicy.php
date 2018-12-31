@@ -17,7 +17,7 @@ class StreamPolicy
      * @param  \App\Stream  $stream
      * @return mixed
      */
-    public function view(User $user, Stream $stream)
+    public function view(?User $user, Stream $stream)
     {
         return true;
     }
