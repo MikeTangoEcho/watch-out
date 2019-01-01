@@ -32,4 +32,17 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany('App\Stream');
     }
+
+    public function streamChunkMetrics()
+    {
+        return $this->hasManyThrough('App\StreamChunkMetric', 'App\Stream');
+    }
+
+    public function averageViewers()
+    {
+        // TODO Use it has relation to group queries
+        return ceil($this->streamChunkMetrics()
+            ->where('chunk_id', '>', 0)
+            ->avg('views'));
+    }
 }

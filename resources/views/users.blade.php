@@ -10,6 +10,7 @@
                     <th scope="col">{{ __('Name') }}</th>
                     <th scope="col">{{ __('Joined At') }}</th>
                     <th scope="col">{{ __('Streams') }}</th>
+                    <th scope="col">{{ __('Avg Viewers') }}</th>
                 <tr>
             </thead>
             <tbody>
@@ -19,6 +20,7 @@
                     <td>{{ $user->name }}</td>
                     <td>{{ $user->created_at }}</td>
                     <td>{{ $user->streams_count }}</td>
+                    <td>{{ $user->averageViewers() }}</td>
                 <tr>
                 @endforeach
             </tbody>
