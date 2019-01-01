@@ -12,6 +12,17 @@ class StreamChunk extends Model
         return $this->belongsTo('App\Stream');
     }
 
+    public function metric()
+    {
+        // Laravel doesnt easily handle compound keys
+        return $this->hasOne('App\StreamChunkMetric', 'stream_id', 'stream_id')
+            ->where('chunk_id', '=', $this->chunk_id)
+            ->withDefault([
+                'stream_id' => $this->stream_id,
+                'chunk_id' => $this->chunk_id
+            ]);
+    }
+
     public static function getFilename($streamId, $chunkId, $clusterOffset) {
         // TODO Autogenerate from attribute
         return "streams/" . $streamId

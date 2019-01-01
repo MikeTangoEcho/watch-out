@@ -12,6 +12,11 @@ class Stream extends Model
         return $this->hasMany('App\StreamChunk');
     }
 
+    public function chunkMetrics()
+    {
+        return $this->hasMany('App\StreamChunkMetric');
+    }
+
     public function user() 
     {
         return $this->BelongsTo('App\User');
@@ -27,6 +32,18 @@ class Stream extends Model
     {
         return $this->hasOne('App\StreamChunk')
             ->orderBy('chunk_id', 'desc');
+    }
+
+    /**
+     * TODO find best ways to present the views
+     */
+    public function maxViewers()
+    {
+        return $this->chunkMetrics()
+            // Exclude Init segment
+            // InitSegment's views = number of times the stream has been joined
+            ->where('chunk_id', '>', 0)
+            ->max('views');
     }
 
     public function scopeStreamingSince($query, $interval)

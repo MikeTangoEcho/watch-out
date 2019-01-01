@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Stream;
 use App\StreamChunk;
+use App\StreamChunkMetric;
 use App\Lib\Webm;
 use App\Http\Requests\EditStream;
 
@@ -241,6 +242,8 @@ class StreamController extends Controller
             if ($chunkId > 0) {
                $nextChunkId = $chunkId + 1;
             }
+            // Increments Views
+            $streamChunk->metric()->increment('views');
         }
         
         return response()->stream(function() use ($streamChunk, $seekCluster) {
