@@ -6,7 +6,7 @@ class Streamer {
     this.playerVideo = playerVideo;
     this.nextChunk = 0;
     this.waitCounter = 0;
-    this.maxWaitCounter = 10;
+    this.maxWaitCounter = 5; // Server default to 2sec of retry so 10s before closing the streams
     this.queuedBlobs = [];
   }
 

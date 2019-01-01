@@ -7,15 +7,15 @@ class Recorder {
       audio: true,
       // TODO audio only, but container is totally different
       video: { 
-        width: { min: 640, ideal: 640 },
-        height: { min: 480, ideal: 480 }
+        width: { min: 320, ideal: 320 },
+        height: { min: 240, ideal: 240 }
       }
     };
     // TODO Find acceptable quality, low bandwidth and low cpu!
     // 9mo ~ 1min
     this.mediaRecorderOptions = {
       audioBitsPerSecond : 64000, // Low quality ~ phone
-      videoBitsPerSecond : 1500000, // Low quality ~ 360p
+      videoBitsPerSecond : 500000, // Low quality ~ 360p
     };
     this.playerVideo = playerVideo;
     // Reducing the delay of push:
@@ -23,6 +23,7 @@ class Recorder {
     // + small payload, thus less memory bottleneck
     // - increase cpu load (firefox chunk with bad timecode, redo in js ?)
     // - increase HTTP client request over time
+    // - several streams at the same time will struggle
     this.pushDelayMs = 2000; 
   }
 
