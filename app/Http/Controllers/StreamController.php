@@ -20,6 +20,28 @@ class StreamController extends Controller
     }
 
     /**
+     * Display a home page
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function home()
+    {
+        // Nb of Stream in the last hour
+        $lastStreamId = Stream::streamingSince(60)->pluck('id');
+        Log::debug($lastStreamId);
+        $streamers = count($lastStreamId);
+        $viewers = ceil(StreamChunkMetric::whereIn('stream_id', $lastStreamId)
+            ->ignoreInitSegment()
+            ->createdSince(60)
+            ->avg('views'));
+
+        return view('home', [
+            'streamers' => $streamers,
+            'viewers' => $viewers
+        ]);
+    }
+
+    /**
      * Display a listing of the last stream.
      *
      * @return \Illuminate\Http\Response
@@ -29,7 +51,6 @@ class StreamController extends Controller
         $streams = Stream::orderBy('updated_at', 'desc')
             ->with('user:id,name')
             ->streamingSince(60)
-            ->limit(1) // FIX
             ->paginate();
         return view('streams', ['streams' => $streams]);
     }
@@ -97,10 +118,10 @@ class StreamController extends Controller
         $this->authorize('create', Stream::class);
 
         $stream = new Stream();
-        $stream->title = "Do it Live!";
+        $stream->title = config('watchout.stream_title');
         // Most supported codec
         // TODO allow user to choose codecs, but warns that some browser may not support it
-        $stream->mime_type = 'video/webm;codecs="opus,vp8"';
+        $stream->mime_type = config('watchout.mime_type');
         $stream->user_id = Auth::id();
         $stream->save();
 
@@ -201,6 +222,15 @@ class StreamController extends Controller
         fclose($fStream);
         // Increments total_size
         $stream->increment('total_size', $chunkSize);
+        
+        // Will a delay of 3sec we retreive the viewers of last 3
+        $views = StreamChunkMetric::where([
+            'stream_id' => $stream->id,
+            'chunk_id' => max($chunkId - 1, 1)
+        ])->pluck('views')->first();
+
+        return response(null, 200)
+            ->header('X-Views', $views);
     }
 
     /**
@@ -217,7 +247,7 @@ class StreamController extends Controller
         $filesToStream = [];
         $nextChunkId = -1;
         $seekCluster = false;
-
+        $views = 0;
         $chunkId = intval($request->header('X-Chunk-Order'));
 
         $streamChunk = StreamChunk::where('stream_id', $stream->id);
@@ -244,6 +274,11 @@ class StreamController extends Controller
             }
             // Increments Views
             $streamChunk->metric()->increment('views');
+            // Get before Chunk nb of views
+            $views = StreamChunkMetric::where([
+                'stream_id' => $stream->id,
+                'chunk_id' => max($chunkId - 2, 1),
+            ])->pluck('views')->first();
         }
         
         return response()->stream(function() use ($streamChunk, $seekCluster) {
@@ -271,7 +306,8 @@ class StreamController extends Controller
             'Content-Type'          => $stream->mime_type,
             'X-Chunk-Order'         => $chunkId,
             'X-Next-Chunk-Order'    => $nextChunkId,
-            'Retry-After'           => 2
+            'X-Views'               => $views,
+            'Retry-After'           => config('watchout.push_delay') / 1000
         ]);
     }
 

@@ -13,6 +13,8 @@
 
 Auth::routes(['verify' => true]);
 
+Route::get('/', 'StreamController@home');
+
 Route::resource('users', 'UserController')
     ->middleware('auth');
 Route::put('users/{user}/password', 'UserController@updatePassword')

@@ -2,10 +2,11 @@
 
 class Recorder {
 
-  constructor(playerVideo) {
+  constructor(pushDelayMs, playerVideo, viewsCounter) {
     this.userMediaConstraints = {
       audio: true,
       // TODO audio only, but container is totally different
+      // TODO check weird bug when starting recorder hangs until media Constraints changes
       video: { 
         width: { min: 320, ideal: 320 },
         height: { min: 240, ideal: 240 }
@@ -18,13 +19,16 @@ class Recorder {
       videoBitsPerSecond : 500000, // Low quality ~ 360p
     };
     this.playerVideo = playerVideo;
+    this.viewsCounter = viewsCounter;
     // Reducing the delay of push:
     // + reduce the latency
     // + small payload, thus less memory bottleneck
     // - increase cpu load (firefox chunk with bad timecode, redo in js ?)
     // - increase HTTP client request over time
     // - several streams at the same time will struggle
-    this.pushDelayMs = 2000; 
+    this.pushDelayMs = pushDelayMs;
+
+    this.views = 0;
   }
 
   get src() {
@@ -69,7 +73,13 @@ class Recorder {
       // Push Data
       axios.post(this.src, e.data,
         { headers: { 'X-Chunk-Order': dataChunkOrder }})
-        .then(response => console.log(response))
+        .then(response => {
+          this.views = response.headers['x-views'];
+          if (this.viewsCounter) {
+            this.viewsCounter.innerHTML = this.views;
+          }
+          console.log(response);
+        })
         .catch(this.stopRecording.bind(this));
     }  
   }
@@ -100,7 +110,7 @@ class Recorder {
       this.mediaRecorder.stop();
     }
     this.mediaStream.stop();
-    console.log('Recorded Blobs: ', this.queuedBlobs);
+    console.log('Stream stopped', this.mediaStream);
   }
 
   readStream(stream) {

@@ -10,10 +10,12 @@
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
         <!-- Styles -->
         <link rel="stylesheet" type="text/css" href="{{ asset('css/app.css') }}">
+
+        <title>{{ config('app.name', 'Laravel') }} | @yield('title')</title>
     </head>
     <body>
         <div id="app">
-            <nav class="navbar navbar-expand-md navbar-light">
+            <nav class="navbar navbar-expand-md navbar-dark bg-dark">
                 <div class="container">
                     <a class="navbar-brand" href="{{ url('/') }}">
                         {{ config('app.name', 'Laravel') }}
@@ -25,13 +27,13 @@
                     <div class="collapse navbar-collapse" id="navbarSupportedContent">
                         <!-- Left Side Of Navbar -->
                         <ul class="navbar-nav mr-auto">
-                            <li class="nav-item">
+                            <li class="nav-item {{ Request::routeIs('streams.index') ? 'active' : null }}">
                                 <a class="nav-link" href="{{ route('streams.index') }}">{{ __('Watch') }}</a>
                             </li>
-                            <li class="nav-item">
+                            <li class="nav-item {{ Request::routeIs('streams.record') ? 'active' : null }}">
                                 <a class="nav-link" href="{{ route('streams.record') }}">{{ __('Record') }}</a>
                             </li>
-                            <li class="nav-item">
+                            <li class="nav-item {{ Request::routeIs('users.index') ? 'active' : null }}">
                                 <a class="nav-link" href="{{ route('users.index') }}">{{ __('Streamers') }}</a>
                             </li>
                             @yield('navigation')
@@ -52,7 +54,7 @@
                                     @endif
                                 </li>
                             @else
-                                <li class="nav-item dropdown">
+                                <li class="nav-item dropdown active">
                                     <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
                                         {{ Auth::user()->name }} <span class="caret"></span>
                                     </a>
@@ -89,7 +91,7 @@
             @yield('content')
             </main> 
         </div>
-        <script type="text/javascript" src="{{ asset('js/app.js') }}"></script>
+        <script type="text/javascript" src="{{ mix('js/app.js') }}"></script>
         @stack('scripts')
     </body>    
 </html>

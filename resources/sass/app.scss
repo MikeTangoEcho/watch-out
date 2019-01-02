@@ -38,7 +38,15 @@
     color: white;
     font-size: 18px;
     z-index:  2;
-  };  
+  };
+  .stream-url {
+    position: absolute;
+    top: $stream-height - 20px;
+    left: $stream-width - 40px;
+    color: white;
+    font-size: 18px;
+    z-index:  2;
+  };
 };
 
 .scroll-container {

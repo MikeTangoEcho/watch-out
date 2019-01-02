@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', __('Watch'))
+
 @push('scripts')
 <script src="{{ asset('js/streamer.js') }}"></script>
 @endpush
@@ -8,7 +10,7 @@
 <div class="container">
     <div class="row">
     @foreach($streams as $stream)
-        @component('components.stream', ['stream' => $stream])
+        @component('components.stream_thumb', ['stream' => $stream])
         @endcomponent
     @endforeach
     </div>

@@ -7,7 +7,7 @@ class Streamer {
     this.nextChunk = 0;
     this.waitCounter = 0;
     this.maxWaitCounter = 5; // Server default to 2sec of retry so 10s before closing the streams
-    this.queuedBlobs = [];
+    //this.queuedBlobs = [];
   }
 
   get src() {
@@ -82,7 +82,7 @@ class Streamer {
       // TODO Nothing if stuck on block 0
       console.log("Pulled Chunk", + response.headers['x-chunk-order']);
       this.nextChunk = Number(response.headers['x-next-chunk-order']);
-      this.queuedBlobs.push(response.data);
+      //this.queuedBlobs.push(response.data);
       // sourceBuffer.updating = true before append
       this.sourceBuffer.appendBuffer(response.data);
       this.sourceBuffer.addEventListener('updateend', this.readStream.bind(this), { 'once': true, 'passive': true });

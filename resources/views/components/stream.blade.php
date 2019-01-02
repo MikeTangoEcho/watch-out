@@ -1,11 +1,9 @@
-<div class="stream">
-    <span class="stream-title scroll-container">
-        <p class="scroll-left">{{ $stream->user->name }} -- {{ $stream->title }}</p>
-    </span>
-    <i class="stream-mute material-icons">volume_off</i>
+<h1>{{ $stream->user->name }}. {{ $stream->title }}</h1>
+<div class="embed-responsive embed-responsive-16by9">
     <video
         poster="{{ asset('images/mire160x120.png') }}"
         class="streamer"
+        controls
         muted
         autoplay
         data-src="{{ route('streams.pull', ['stream' => $stream->id, 'ts' => now()->timestamp]) }}"

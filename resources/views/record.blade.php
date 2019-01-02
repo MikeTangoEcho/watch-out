@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', __('Record'))
+
 @push('scripts')
 <script src="{{ asset('js/recorder.js') }}"></script>
 @endpush
@@ -8,6 +10,7 @@
 <div class="container recorder">
     <div class="row">
         <div class="col">
+            <h1 class="float-right"><span class="views">0</span><i class="material-icons">person</i></h1>
             <h1>{{ $stream->title }}</h1>
         </div>
     </div>
@@ -43,9 +46,10 @@
     const stopButton = document.querySelector('button#stop');
     const successMessage = document.querySelector('div#success_message');
     const recorderContainer = document.querySelector('div.recorder');
+    const viewsCounter = document.querySelector('span.views');
 
     // Init Recorder
-    var recorder = new Recorder(previewVideo);
+    var recorder = new Recorder({{ config('watchout.push_delay') }}, previewVideo, viewsCounter);
 
     // Event Listener
     recordButton.addEventListener('click', recorder.openStream.bind(recorder));
