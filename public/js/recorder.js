@@ -6,10 +6,12 @@ class Recorder {
     this.userMediaConstraints = {
       audio: true,
       // TODO audio only, but container is totally different
-      // TODO check weird bug when starting recorder hangs until media Constraints changes
+      // Weird Bug: MediaRecorder in state recording but no data get recorded
+      // Fix: switching to video:true remove the hangs
+      //video: true
       video: { 
-        width: { min: 320, ideal: 320 },
-        height: { min: 240, ideal: 240 }
+        width: 320,
+        height: 240
       }
     };
     // TODO Find acceptable quality, low bandwidth and low cpu!
@@ -89,7 +91,6 @@ class Recorder {
     this.mediaRecorderOptions.mimeType = this.mimeType;
     try {
       this.mediaRecorder = new MediaRecorder(this.mediaStream, this.mediaRecorderOptions);
-      console.log('Created MediaRecorder', this.mediaRecorder, 'with options', this.mediaRecorderOptions);
     } catch (e) {
       console.error('Exception while creating MediaRecorder:', e);
       return;
@@ -97,7 +98,9 @@ class Recorder {
   
     this.mediaRecorder.addEventListener('stop', this.onRecorderStop.bind(this));
     this.mediaRecorder.addEventListener('dataavailable', this.onDataAvailable.bind(this));
-
+    //this.mediaRecorder.ondataavailable = this.onDataAvailable;
+    console.log('Created MediaRecorder', this.mediaRecorder, 'with options', this.mediaRecorderOptions);
+    
     // Chrome give us avg 1 Cluster every 12s
     // Firefox make one Cluster per trigger
     this.mediaRecorder.start(this.pushDelayMs);

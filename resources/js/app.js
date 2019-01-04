@@ -21,8 +21,10 @@ window.Vue = require('vue');
 // files.keys().map(key => Vue.component(key.split('/').pop().split('.')[0], files(key)))
 
 // TODO vanilla js to vue js
-//Vue.component('recorder-component', require('./components/RecorderComponent.vue'));
-//Vue.component('streamer-component', require('./components/StreamerComponent.vue'));
+// Added .default due to issue with vue-tempalte-compiler. Need to dig it when got time
+//Vue.component('recorder-component', require('./components/RecorderComponent.vue').default);
+//Vue.component('streamer-component', require('./components/StreamerComponent.vue').default);
+Vue.component('stream-configuration', require('./components/StreamConfigurationComponent.vue').default);
 
 /**
  * Next, we will create a fresh Vue application instance and attach it to
@@ -31,5 +33,5 @@ window.Vue = require('vue');
  */
 
 const app = new Vue({
-    el: '#app'
+    el: '#app',
 });
