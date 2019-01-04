@@ -46,6 +46,10 @@ class Stream extends Model
             ->max('views');
     }
 
+    public function scopeActive($query) {
+        return $query->where('total_size', '>', 0);
+    }
+    
     public function scopeStreamingSince($query, $interval)
     {
         return $query->whereHas('chunks', function ($subquery) use ($interval) {

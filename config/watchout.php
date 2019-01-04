@@ -36,4 +36,19 @@ return [
 
     'mime_type' => env('WATCHOUT_MIME_TYPE', 'video/webm;codecs="opus,vp8"'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Stream constraints
+    |--------------------------------------------------------------------------
+    |
+    | Define differents requirements in number, size and interval to avoid
+    | being overwhelmed by users and make a paywall to handle the growing infra
+    |
+    */
+
+    'constraint' => [
+        'stream_count' => env('WATCHOUT_CONSTRAINT_STREAM_COUNT', 100),
+        'stream_size' => env('WATCHOUT_CONSTRAINT_STREAM_SIZE_BYTE', 10 * 1024000), // 10mo
+        'interval' => env('WATCHOUT_CONSTRAINT_INTERVAL_MIN', 24 * 60), // 1 day
+    ]
 ];

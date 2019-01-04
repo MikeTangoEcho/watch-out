@@ -34,6 +34,18 @@ class StreamPolicy
     }
 
     /**
+     * Determine whether the user can create streams.
+     *
+     * @param  \App\User  $user
+     * @return mixed
+     */
+    public function broadcast(User $user)
+    {
+        return $user->hasVerifiedEmail()
+            && $user->canBroadcast();
+    }
+
+    /**
      * Determine whether the user can update the stream.
      *
      * @param  \App\User  $user

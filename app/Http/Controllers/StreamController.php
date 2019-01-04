@@ -117,15 +117,23 @@ class StreamController extends Controller
     {
         $this->authorize('create', Stream::class);
 
-        $stream = new Stream();
-        $stream->title = config('watchout.stream_title');
-        // Most supported codec
-        // TODO allow user to choose codecs, but warns that some browser may not support it
-        $stream->mime_type = config('watchout.mime_type');
-        $stream->user_id = Auth::id();
-        $stream->save();
-
-        return view('record', ['stream' => $stream]);
+        // TODO find a cleanest way with exception or gate redirect
+        if (Auth::user()->can('broadcast', Stream::class)) {
+            $stream = new Stream();
+            $stream->title = config('watchout.stream_title');
+            // Most supported codec
+            // TODO allow user to choose codecs, but warns that some browser may not support it
+            $stream->mime_type = config('watchout.mime_type');
+            $stream->user_id = Auth::id();
+            $stream->save();
+            return view('record', ['stream' => $stream]);
+        } else {
+            $constraint = config('watchout.constraint');
+            return view('constraint', [
+                'quota' => Auth::user()->quota($constraint['interval']),
+                'constraint' => $constraint
+            ]);
+        }
     }
 
     /**
@@ -137,6 +145,9 @@ class StreamController extends Controller
      */
     public function push(Request $request, Stream $stream)
     {
+        // TODO optimize to avoid aggregate every 2 sec.
+        // Create a timeseries table with current total according to constraints
+        $this->authorize('broadcast', Stream::class);
         $this->authorize('update', $stream);
 
         // Same RFC, different behaviors, and dont want to rework chunk on js

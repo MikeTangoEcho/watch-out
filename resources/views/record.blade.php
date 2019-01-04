@@ -42,7 +42,7 @@
                             </div>
                         </div>
                     </form>
-                    <h1 v-else id="stream-title"  @click="editing = true">@{{ title }}</h1>
+                    <h1 v-else id="stream-title"  @click="editing = true">@{{ title }} <i class="material-icons">edit</i></h1>
                 </div>
             </stream-configuration>
         </div>

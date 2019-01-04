@@ -17,7 +17,7 @@
                 title: null,
                 newTitle: null,
                 validation: {},
-                editing: true
+                editing: false
             }
         },
         methods: {
