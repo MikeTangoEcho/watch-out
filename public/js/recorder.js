@@ -10,8 +10,9 @@ class Recorder {
       // Fix: switching to video:true remove the hangs
       //video: true
       video: { 
-        width: 320,
-        height: 240
+        width: { max: 320 },
+        height: { max: 240 },
+        frameRate: { max: 15 }
       }
     };
     // TODO Find acceptable quality, low bandwidth and low cpu!

@@ -11,7 +11,7 @@ return [
     |
     */
 
-    'push_delay' => env('WATCHOUT_PUSH_DELAY', 2000),
+    'push_delay' => env('WATCHOUT_PUSH_DELAY', 3000),
 
     /*
     |--------------------------------------------------------------------------

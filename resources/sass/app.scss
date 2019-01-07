@@ -13,12 +13,22 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 };
 
+// Buttons
+
+.btn {
+  .material-icons {
+    font-size: 15px;
+    vertical-align: middle;
+  };
+};
+
 // Streamer
 
 .stream {
   position: relative;
   width: $stream-width;
   height: $stream-height;
+  background-color: black;
   video {
     width: $stream-width;
     height: $stream-height;
