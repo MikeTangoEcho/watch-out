@@ -23,7 +23,8 @@ window.Vue = require('vue');
 // TODO vanilla js to vue js
 // Added .default due to issue with vue-tempalte-compiler. Need to dig it when got time
 //Vue.component('recorder-component', require('./components/RecorderComponent.vue').default);
-//Vue.component('streamer-component', require('./components/StreamerComponent.vue').default);
+Vue.component('streamer', require('./components/StreamerComponent.vue').default);
+Vue.component('screen', require('./components/ScreenComponent.vue').default);
 Vue.component('stream-configuration', require('./components/StreamConfigurationComponent.vue').default);
 
 /**

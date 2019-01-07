@@ -50,9 +50,19 @@ class StreamController extends Controller
     {
         $streams = Stream::orderBy('updated_at', 'desc')
             ->with('user:id,name')
-            ->streamingSince(60)
+            //->streamingSince(60)
             ->paginate();
         return view('streams', ['streams' => $streams]);
+    }
+
+    /**
+     * Display a listing of the last stream in a Screen.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function screen()
+    {
+        return view('screen');
     }
 
     /**

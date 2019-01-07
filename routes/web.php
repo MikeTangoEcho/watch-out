@@ -22,6 +22,7 @@ Route::put('users/{user}/password', 'UserController@updatePassword')
     ->name('users.update_password');
 
 Route::resource('streams', 'StreamController');
+Route::get('/screen', 'StreamController@screen');
 Route::get('/streams/{stream}/chunks', 'StreamController@pull')
     ->name('streams.pull');
 Route::get('/streams/{stream}/full', 'StreamController@full')
