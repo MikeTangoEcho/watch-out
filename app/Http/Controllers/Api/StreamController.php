@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Stream;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Stream as StreamResource;
+use App\Http\Requests\FilterStream;
+
+
 class StreamController extends Controller
 {
     /**
@@ -13,13 +17,21 @@ class StreamController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(FilterStream $request)
     {
+        $filters = $request->validated();
+        Log::debug($filters);
         $streams = Stream::orderBy('updated_at', 'desc')
             ->with('user:id,name')
 //            ->streamingSince(60)
-            ->paginate()
             ;
+        if (isset($filters['excluded_ids']) && $filters['excluded_ids']) { 
+            $streams = $streams
+                ->whereNotIn('id', $filters['excluded_ids']);
+        }
+        if (isset($filters['per_page'])) {
+            $streams = $streams->paginate($filters['per_page']);
+        }
 
         return StreamResource::collection($streams);
     }
