@@ -38,7 +38,7 @@
     top: 5px;
     left: 5px;
     color: white;
-    font-size: 9px;
+    font-size: 12px;
     width: $stream-width - 10px; 
   };  
   .stream-mute {
@@ -48,6 +48,15 @@
     color: white;
     font-size: 18px;
     z-index:  2;
+    cursor: pointer;
+  };
+  &:hover {
+    .stream-url {
+      display: block;
+    };
+    .stream-shuffle {
+      display: block;
+    };
   };
   .stream-url {
     position: absolute;
@@ -56,6 +65,17 @@
     color: white;
     font-size: 18px;
     z-index:  2;
+    display: none;
+  }
+  .stream-shuffle {
+    position: absolute;
+    top: $stream-height - 20px;
+    left: $stream-width - 60px;
+    color: white;
+    font-size: 18px;
+    z-index:  2;
+    cursor: pointer;
+    display: none;
   };
 };
 

@@ -71,17 +71,16 @@ class Recorder {
   onDataAvailable(e) {
     if (e.data && e.data.size > 0) {
       var dataChunkOrder = this.chunkOrder;
-      console.log('Pushed Blob', dataChunkOrder);
       this.chunkOrder++;
       // Push Data
       axios.post(this.src, e.data,
         { headers: { 'X-Chunk-Order': dataChunkOrder }})
         .then(response => {
+          console.log('Pushed Chunk', dataChunkOrder);
           this.views = response.headers['x-views'];
           if (this.viewsCounter) {
             this.viewsCounter.innerHTML = this.views;
           }
-          console.log(response);
         })
         .catch(this.stopRecording.bind(this));
     }  
@@ -120,6 +119,10 @@ class Recorder {
   readStream(stream) {
     console.log('getUserMedia() got stream:', stream);
   
+    // Apply Constraints
+    stream.getVideoTracks()[0]
+      .applyConstraints(this.userMediaConstraints.video);
+
     // re-add the stop function
     // Chrome deprecated stop function
     if(!stream.stop && stream.getTracks) {
@@ -137,7 +140,8 @@ class Recorder {
 
   openStream() {
     if (navigator.mediaDevices) {
-      navigator.mediaDevices.getUserMedia(this.userMediaConstraints)
+      // Using specific constraints on first Media Query may hangs
+      navigator.mediaDevices.getUserMedia({ audio: true, video: true})
         .then(this.readStream.bind(this))
         .catch(e => console.error('navigator.getUserMedia error:', e));    
     } else {

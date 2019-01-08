@@ -26,6 +26,7 @@ window.Vue = require('vue');
 Vue.component('streamer', require('./components/StreamerComponent.vue').default);
 Vue.component('screen', require('./components/ScreenComponent.vue').default);
 Vue.component('stream-configuration', require('./components/StreamConfigurationComponent.vue').default);
+Vue.component('unit', require('./components/UnitComponent.vue').default);
 
 /**
  * Next, we will create a fresh Vue application instance and attach it to

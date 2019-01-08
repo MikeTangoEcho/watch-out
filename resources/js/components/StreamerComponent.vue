@@ -3,6 +3,7 @@
         <span class="stream-title scroll-container">
             <p class="scroll-left">{{ video.user.name }}. {{ video.title }}</p>
         </span>
+        <i class="stream-shuffle material-icons" @click="close()">shuffle</i>
         <a class="stream-url material-icons" target="_blank" :href="video.url">launch</a>
         <i ref="mute" @click="toggleSound()" class="stream-mute material-icons">volume_off</i>
         <video
@@ -12,7 +13,9 @@
             muted
             autoplay
             :data-src="video.src"
-            :data-mime-type="video.mime_type">
+            :data-mime-type="video.mime_type"
+            @ended="closed()"
+            >
         </video>
     </div>
 </template>
@@ -20,7 +23,12 @@
 <script>
     export default {
         mounted: function() {
-            this.init();
+            this.open();
+            // Listen to ClosedStream
+            // Close itself
+        },
+        beforeDestroy: function() {
+            this.stream = null;
         },
         props: {
             video: {
@@ -46,7 +54,7 @@
            };
         },
         methods: {
-            init: function () {
+            open: function () {
                 this.streamer = new Streamer(this.$refs.video);
                 this.streamer.openStream();
             },
@@ -60,6 +68,12 @@
                     this.$refs.mute.innerHTML = "volume_up";
                     console.log("Unmuted", this.streamer.src);
                 }
+            },
+            closed: function (e) {
+                this.$emit('ended', this.video);
+            },
+            close: function() {
+                this.streamer.closeStream("User Action");
             }
         }
     }

@@ -37,7 +37,7 @@ class Streamer {
     // Chunk are ordered on server side
     this.sourceBuffer.mode = "sequence";
     // Events
-    this.sourceBuffer.addEventListener('update', this.onSourceBufferUpdate.bind(this));
+    //this.sourceBuffer.addEventListener('update', this.onSourceBufferUpdate.bind(this));
     this.sourceBuffer.addEventListener('error', this.onSourceBufferError.bind(this));
     this.sourceBuffer.addEventListener('abort', this.onSourceBufferAbort.bind(this));
 
@@ -74,6 +74,9 @@ class Streamer {
     URL.revokeObjectURL(this.playerVideo.src);
     console.log("Closed Stream", this.src);
     // TODO Remove player
+    // Force trigger of Ended events since endOfStream and RevokeURL doesnt do it
+    // TODO Find why ?
+    this.playerVideo.dispatchEvent(new Event('ended'));
   }
 
   appendBuffer(response) {

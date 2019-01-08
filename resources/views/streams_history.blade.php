@@ -25,7 +25,10 @@
                     <td>{{ $stream->title }}</td>
                     <td>{{ $stream->firstChunk['created_at'] }}</td>
                     <td>{{ $stream->lastChunk['created_at'] }}</td>
-                    <td>{{ $stream->total_size }}</td>
+                    <td><unit
+                        :value="{{ $stream->total_size }}"
+                        :units="[{'unit': 1024000, 'format': 'Mb'}, {'unit': 1024, 'format': 'Kb'}]"></unit>
+                    </td>
                     <td>{{ $stream->mime_type }}</td>
                     <td>{{ $stream->maxViewers() }}</td>
                     <td>
