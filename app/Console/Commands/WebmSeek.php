@@ -42,7 +42,6 @@ class WebmSeek extends Command
     {
         $stream = Storage::readStream($this->argument('file'));
         $webm = new Webm();
-        //$webm->verbose = True;
         $offset = 0;
         $splitId = 1;
         $this->info('Read Webm');

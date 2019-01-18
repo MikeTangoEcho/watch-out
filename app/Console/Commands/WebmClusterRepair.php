@@ -35,14 +35,13 @@ class WebmClusterRepair extends Command
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @return void
      */
     public function handle()
     {
         $stream = Storage::readStream($this->argument('file'));
-        $webm = new Webm();
-        $webm->verbose = true;
-
+        $webm = new Webm(true);
+        
         rewind($stream);
         if ($this->option('check')) {
             if ($webm->needRepairCluster($stream)) {

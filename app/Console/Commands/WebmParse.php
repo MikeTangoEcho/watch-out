@@ -41,8 +41,7 @@ class WebmParse extends Command
     public function handle()
     {
         $stream = Storage::readStream($this->argument('file'));
-        $webm = new Webm();
-        $webm->verbose = True;
+        $webm = new Webm(true);
         $this->info('Read Webm');
         $ebml = $webm->parse($stream);
         fclose($stream);

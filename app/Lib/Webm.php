@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Lib;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Toolbox to manage webm container based on matroska
@@ -11,15 +10,9 @@ use Illuminate\Support\Facades\Log;
  */
 class Webm
 {
-    /**
-     * Base log for debug
-     */
-    private function log($o) {
-        if ($this->verbose)
-            var_dump($o);
-    }
-
-    public $verbose = False;
+    private $verbose = False;
+    private $kMaxIdLengthInBytes = 4;
+    private $kMkvEBMLMaxSizeLength = 8;
 
     // https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/common/webmids.h
     // https://chromium.googlesource.com/webm/libvpx/+/master/webmdec.h
@@ -308,8 +301,22 @@ class Webm
         ],
     ];
 
-    private $kMaxIdLengthInBytes = 4;
-    private $kMkvEBMLMaxSizeLength = 8;
+    /**
+     * TODO: find best way to handle and inject custom logger
+     * according to the section of the code without adding more configuration
+     */
+    public function __construct($verbose = False) {
+        $this->verbose = $verbose;
+    }
+
+    /**
+     * Base log for debug
+     */
+    private function log($message) {
+        if ($this->verbose) {
+            var_dump($message);
+        }
+    }
 
     /**
      * Return value in the format described by the spec
@@ -318,7 +325,7 @@ class Webm
         switch ($format) {
             case 'int':
             case 'uint':
-                return $this->UnserializeUInt($value);
+                return $this->unserializeUInt($value);
             case 'str':
             case 'utf8str':
                 return substr($value, 0, 25);
@@ -329,7 +336,7 @@ class Webm
                 fwrite($tmp, $value);
                 rewind($tmp);
                 $track_id = $this->getUIntLength($tmp);
-                $timecode = $this->UnserializeUInt(fread($tmp, 2));
+                $timecode = $this->unserializeUInt(fread($tmp, 2));
                 fclose($tmp);
                 return [
                     'track_id' => $track_id,
@@ -406,7 +413,7 @@ class Webm
     /**
      * Convert binary string holding an unsigned integer big endians to integer
      */
-    private function UnserializeUInt($bin) {
+    private function unserializeUInt($bin) {
         $bin = str_pad($bin, 4, chr(0), STR_PAD_LEFT);
         $r = unpack('N', $bin);
         if (is_array($r))
