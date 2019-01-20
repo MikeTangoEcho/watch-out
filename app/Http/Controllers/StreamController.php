@@ -178,6 +178,11 @@ class StreamController extends Controller
         // Start with EBML header => look for next cluter and split
         // Not start with Cluster => look for next cluster and split by timecode, begin will be appended to last file
         // Create an handle to manage the payload
+        $chunkId = $request->header('X-Chunk-Order');
+        if ($chunkId <= 0) {
+            // TODO Validated header
+            abort('400', 'Invalid Chunk Order, must be positive');
+        }
         $fStream = fopen('php://temp', 'wb');
         $chunkSize = fwrite($fStream, $request->getContent());
         rewind($fStream);
@@ -186,16 +191,15 @@ class StreamController extends Controller
         // Needed for Chrome, allow me flags and seeks the closest one.
         $clusterOffset = $webm->seekNextId($fStream, '1f43b675');
         rewind($fStream);
-        $chunkId = $request->header('X-Chunk-Order');
         // TODO Consistency check if possible ?
         // Chunk are ordered by client but http request may not arrive at the same time
         // Check if first bytes is the EMBL Header
         if ($chunkId == 1) {
             // Fist chunk must contains the EBMLHeader
             // TODO Parse the whole if it doesnt affects spec
-            $tag = bin2hex(fread($fStream, 5));
+            $tag = bin2hex(fread($fStream, 4));
             rewind($fStream);
-            if ($tag == '1a45dfa3') {
+            if ($tag != '1a45dfa3') {
                 Log::error('stream[' . $stream->id .'] first chunk has no EBMLHeader tag');
                 abort('400', 'Invalid Chunk, first chunk must hold the EBMLHeader');
             }
@@ -301,10 +305,19 @@ class StreamController extends Controller
                 'chunk_id' => max($chunkId - 2, 1),
             ])->pluck('views')->first();
         }
-        
-        return response()->stream(function() use ($streamChunk, $seekCluster) {
-            // https://www.w3.org/TR/media-source/#init-segment
-            if ($streamChunk && Storage::exists($streamChunk->filename)) {
+
+        $headers = [
+            'Cache-Control'         => 'no-cache, no-store',
+            'Pragma'                => 'public',
+            'Content-Type'          => $stream->mime_type,
+            'X-Chunk-Order'         => $chunkId,
+            'X-Next-Chunk-Order'    => $nextChunkId,
+            'X-Views'               => $views,
+            'Retry-After'           => config('watchout.push_delay') / 1000
+        ];
+        // https://www.w3.org/TR/media-source/#init-segment
+        if ($streamChunk && Storage::exists($streamChunk->filename)) {
+            return response()->stream(function() use ($streamChunk, $seekCluster) {
                 $stream = Storage::readStream($streamChunk->filename);
                 if ($seekCluster && $streamChunk->cluster_offset) {
                     fseek($stream, $streamChunk->cluster_offset);
@@ -317,19 +330,10 @@ class StreamController extends Controller
                 Log::debug('stream [' . $streamChunk->stream_id 
                     . '] chunk [' . $streamChunk->chunk_id 
                     . '] file sent: ' . $streamChunk->filename);
-            } else {
-                // No Content
-                abort(204);
-            }
-        }, 200, [
-            'Cache-Control'         => 'no-cache, no-store',
-            'Pragma'                => 'public',
-            'Content-Type'          => $stream->mime_type,
-            'X-Chunk-Order'         => $chunkId,
-            'X-Next-Chunk-Order'    => $nextChunkId,
-            'X-Views'               => $views,
-            'Retry-After'           => config('watchout.push_delay') / 1000
-        ]);
+                }, 200, $headers);
+        }
+
+        abort(204, 'No Chunk', $headers);
     }
 
     /**

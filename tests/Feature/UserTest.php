@@ -88,7 +88,13 @@ class UserTest extends TestCase
      */
     public function testUserEdit()
     {
+        $user = factory(App\User::class)->create();
 
+        $this->actingAs($user)
+            ->put('/users/' . $user->id, ['name' => 'Hello'])
+            ->assertRedirect('/users/' . $user->id . '/edit');
+
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'name' => 'Hello']);
     }
 
 }
