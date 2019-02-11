@@ -4,7 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
-use App\Lib\Webm;
+
+use App\Support\Facades\Webm;
 
 class WebmClusterRepair extends Command
 {
@@ -40,7 +41,7 @@ class WebmClusterRepair extends Command
     public function handle()
     {
         $stream = Storage::readStream($this->argument('file'));
-        $webm = new Webm(true);
+        $webm = Webm::withDebug();
         
         rewind($stream);
         if ($this->option('check')) {

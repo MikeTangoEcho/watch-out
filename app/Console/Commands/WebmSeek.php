@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
-use App\Lib\Webm;
+use App\Support\Facades\Webm;
 
 class WebmSeek extends Command
 {
@@ -41,11 +41,10 @@ class WebmSeek extends Command
     public function handle()
     {
         $stream = Storage::readStream($this->argument('file'));
-        $webm = new Webm();
         $offset = 0;
         $splitId = 1;
         $this->info('Read Webm');
-        while ($pos = $webm->seekNextId($stream, $this->argument('hextag'))) {
+        while ($pos = Webm::seekNextId($stream, $this->argument('hextag'))) {
             if ($this->option('split')) {
                 $tmp = fopen("php://temp", "wb");
                 fseek($stream, 0);

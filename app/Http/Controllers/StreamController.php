@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\Storage;
 use App\Stream;
 use App\StreamChunk;
 use App\StreamChunkMetric;
-use App\Lib\Webm;
 use App\Http\Requests\EditStream;
+
+use App\Support\Facades\Webm;
 
 class StreamController extends Controller
 {
@@ -186,10 +187,9 @@ class StreamController extends Controller
         $fStream = fopen('php://temp', 'wb');
         $chunkSize = fwrite($fStream, $request->getContent());
         rewind($fStream);
-        $webm = new Webm();
         // Get pos of first Cluster
         // Needed for Chrome, allow me flags and seeks the closest one.
-        $clusterOffset = $webm->seekNextId($fStream, '1f43b675');
+        $clusterOffset = Webm::seekNextId($fStream, '1f43b675');
         rewind($fStream);
         // TODO Consistency check if possible ?
         // Chunk are ordered by client but http request may not arrive at the same time
@@ -229,11 +229,11 @@ class StreamController extends Controller
             $streamChunk->cluster_offset = $clusterOffset;
             $fChunk = fopen('php://temp', 'wb');
             $streamChunk->filesize = stream_copy_to_stream($fStream, $fChunk);
-            // Repair Chunk if wrong timecode
+            // Repair Chunk if wrong timecode order
             rewind($fChunk);
-            if ($webm->needRepairCluster($fChunk, true)) {
+            if (Webm::needRepairCluster($fChunk, true)) {
                 rewind($fChunk);
-                $fRepaired = $webm->repairCluster($fChunk);
+                $fRepaired = Webm::repairCluster($fChunk);
                 Log::debug('stream[' . $stream->id .'] repair chunk ' . $chunkId);
                 Storage::put($streamChunk->filename, $fRepaired);
                 fclose($fRepaired);
@@ -245,10 +245,10 @@ class StreamController extends Controller
             Log::debug('stream[' . $stream->id .'] push chunk ' . $chunkId);
         }
         fclose($fStream);
-        // Increments total_size
+        // Increments total_size in byte
         $stream->increment('total_size', $chunkSize);
         
-        // Will a delay of 3sec we retreive the viewers of last 3
+        // Average Push delay of 3sec => Return views 3 sec ago
         $views = StreamChunkMetric::where([
             'stream_id' => $stream->id,
             'chunk_id' => max($chunkId - 1, 1)

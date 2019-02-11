@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
-use App\Lib\Webm;
+use App\Support\Facades\Webm;
 
 class WebmParse extends Command
 {
@@ -41,9 +41,8 @@ class WebmParse extends Command
     public function handle()
     {
         $stream = Storage::readStream($this->argument('file'));
-        $webm = new Webm(true);
         $this->info('Read Webm');
-        $ebml = $webm->parse($stream);
+        $ebml = Webm::withDebug()->parse($stream);
         fclose($stream);
         var_dump($ebml);
     }

@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
-use App\Lib\Webm;
+use App\Support\Facades\Webm;
 
 class WebmInitSegment extends Command
 {
@@ -41,10 +41,9 @@ class WebmInitSegment extends Command
     public function handle()
     {
         $stream = Storage::readStream($this->argument('file'));
-        $webm = new Webm(true);
         
         $this->info('Read Webm');
-        $ebml = $webm->parse($stream);
+        $ebml = Webm::withDebug()->parse($stream);
 
         rewind($stream);
         $this->info('Write Header Webm');

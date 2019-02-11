@@ -10,7 +10,7 @@ namespace App\Lib;
  */
 class Webm
 {
-    private $verbose = False;
+    private $debug = False;
     private $kMaxIdLengthInBytes = 4;
     private $kMkvEBMLMaxSizeLength = 8;
 
@@ -301,19 +301,17 @@ class Webm
         ],
     ];
 
-    /**
-     * TODO: find best way to handle and inject custom logger
-     * according to the section of the code without adding more configuration
-     */
-    public function __construct($verbose = False) {
-        $this->verbose = $verbose;
+    public function withDebug($debug = true) {
+        $this->debug = $debug;
+        return $this;
     }
 
     /**
      * Base log for debug
      */
     private function log($message) {
-        if ($this->verbose) {
+        if ($this->debug) {
+            // Custom Logger ?
             var_dump($message);
         }
     }
@@ -350,7 +348,7 @@ class Webm
      * Read an EBML Id from a stream.
      * MaxIdLength should be extracted from EBML header, but here its forced.
      */
-    private function readId($stream) {
+    public function readId($stream) {
         $id = '';
         $size = 0;
         $checkBytes = 0x80;
@@ -382,7 +380,7 @@ class Webm
      * 
      * https://chromium.googlesource.com/webm/libvpx/+/master/third_party/libwebm/mkvparser/mkvparser.cc#172
      */
-    private function getUIntLength($stream) {
+    public function getUIntLength($stream) {
         // Same thing that the Id but max length is different
         $size = 0;
         $length = '';
@@ -413,7 +411,7 @@ class Webm
     /**
      * Convert binary string holding an unsigned integer big endians to integer
      */
-    private function unserializeUInt($bin) {
+    public function unserializeUInt($bin) {
         $bin = str_pad($bin, 4, chr(0), STR_PAD_LEFT);
         $r = unpack('N', $bin);
         if (is_array($r))
